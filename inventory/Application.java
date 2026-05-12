@@ -1,20 +1,28 @@
 package inventory;
 
+import inventory.ui.Navigation;
 import inventory.ui.Window;
+
 import javax.swing.*;
 
+/**
+ * Point d'entrée de l'application.
+ * Lance la fenêtre principale avec la Navigation (sidebar + contenu).
+ */
 public class Application {
+
     public static void main(String[] args) {
-        // Lancer l'interface graphique dans l'EDT (Event Dispatch Thread)
+        // Lancement dans l'Event Dispatch Thread (EDT) — obligatoire pour Swing
         SwingUtilities.invokeLater(() -> {
-            Window mainWindow = new Window();
-            
-            // Créer un panel simple pour tester (remplace MyPanel qui n'existe pas)
-            JPanel testPanel = new JPanel();
-            testPanel.add(new JLabel("Inventory Management System"));
-            testPanel.add(new JButton("Test Button"));
-            
-            mainWindow.setContentPane(testPanel);
+            // Créer et configurer la fenêtre
+            Window mainWindow = new Window("Gestion de Stock");
+
+            // La Navigation contient la sidebar + la zone de contenu
+            Navigation navigation = new Navigation();
+
+            // Injecter la navigation comme contenu principal de la fenêtre
+            mainWindow.setContentPane(navigation);
+            mainWindow.maximize();
             mainWindow.showWindow();
         });
     }
