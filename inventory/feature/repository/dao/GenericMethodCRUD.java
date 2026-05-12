@@ -118,7 +118,7 @@ public class GenericMethodCRUD {
         String table = tableNomDepuisClasse(obj);
         Class<T> cls = (Class<T>) obj.getClass();
         String sql = "SELECT * FROM " + table
-                   + (whereClause != null && !whereClause.isBlank() ? " " + whereClause : "");
+                   + (whereClause != null && !whereClause.trim().isEmpty() ? " " + whereClause : "");
         List<T> resultats = new ArrayList<>();
 
         try (Connection conn = DbConnection.getInstance().getConnexion();
