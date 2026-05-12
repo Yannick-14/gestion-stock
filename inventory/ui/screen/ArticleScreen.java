@@ -38,6 +38,7 @@ public class ArticleScreen extends JPanel {
         List<StockManagementMethod> methods = loadMethods();
 
         // Options du formulaire : champ métier → liste
+        // Cette liste sera utilisée pour remplir le FieldSelect
         Map<String, List<?>> options = new HashMap<>();
         options.put("stockManagementMethod", methods);
 
@@ -51,7 +52,7 @@ public class ArticleScreen extends JPanel {
         content.add(form);
         content.add(Box.createVerticalStrut(16));
 
-        // Bouton
+        // Bouton d'enregistrement
         Button btnSave = new Button("Enregistrer l'article");
         btnSave.setAlignmentX(Component.LEFT_ALIGNMENT);
         btnSave.addActionListener(e -> saveArticle());
@@ -60,16 +61,36 @@ public class ArticleScreen extends JPanel {
         add(new JScrollPane(content), BorderLayout.CENTER);
     }
 
+    /**
+     * Enregistre l'article avec sa méthode de gestion de stock
+     */
     private void saveArticle() {
         try {
+            // Créer une nouvelle instance d'Article
             Article article = new Article();
+            
+            // Remplir l'article avec les données du formulaire
+            // ⚠️ Important : form.getData() retourne maintenant l'objet StockManagementMethod complet,
+            // pas juste son nom en string !
             article = form.getData(article);
-            // Date de création automatique
+            
+            // Ajouter la date de création
             article.setCreatedAt(new java.sql.Timestamp(System.currentTimeMillis()));
+            
+            // Debug : vérifier que l'objet est bien rempli
+            System.out.println("[ArticleScreen] Article à enregistrer :");
+            System.out.println("  - Nom : " + article.getNameArticle());
+            System.out.println("  - Méthode : " + (article.getStockManagementMethod() != null 
+                ? article.getStockManagementMethod().getNameMethod() 
+                : "NULL"));
+            
+            // Enregistrer en base de données
             int id = crud.insertData(article);
+            
             JOptionPane.showMessageDialog(this,
                 "Article enregistré avec succès ! (id=" + id + ")",
                 "Succès", JOptionPane.INFORMATION_MESSAGE);
+                
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this,
                 "Erreur lors de l'enregistrement : " + ex.getMessage(),
@@ -78,6 +99,9 @@ public class ArticleScreen extends JPanel {
         }
     }
 
+    /**
+     * Charge les méthodes de gestion de stock depuis la base de données
+     */
     private List<StockManagementMethod> loadMethods() {
         try {
             return crud.findAllData(new StockManagementMethod());

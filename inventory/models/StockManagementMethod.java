@@ -23,6 +23,6 @@ public class StockManagementMethod {
 
     @Override
     public String toString() {
-        return "StockManagementMethod{id=" + id + ", nameMethod='" + nameMethod + "'}";
+        return nameMethod;
     }
 }
