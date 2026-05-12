@@ -7,301 +7,289 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import inventory.feature.repository.connection.DbConnection;
 
-public class GenericMethodCRUD
-{
-    protected DbConnection connexion;
-    protected String nomTable;
-    public GenericMethodCRUD(){}
-    
+/**
+ * Classe générique de CRUD.
+ * - Le nom de table est déduit automatiquement depuis la classe (camelCase → snake_case).
+ * - Les noms de colonnes suivent la même convention.
+ * - Une seule connexion par opération, fermée proprement.
+ */
+public class GenericMethodCRUD {
 
-    protected DbConnection manaoConnexion()
-    {
-        DbConnection conn=null;
-        try {
-            conn=new DbConnection();
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return this.connexion=conn;
-    }
-    
-
-    protected String getNomTable() {
-        return nomTable;
+    // ── Utilitaire: camelCase → snake_case ────────────────────────────────────
+    /**
+     * Convertit un nom camelCase ou PascalCase en snake_case.
+     * Ex: "stockManagementMethod" → "stock_management_method"
+     *     "Article"               → "article"
+     */
+    protected static String toSnakeCase(String name) {
+        if (name == null || name.isEmpty()) return name;
+        return name
+            .replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2")
+            .replaceAll("([a-z])([A-Z])", "$1_$2")
+            .toLowerCase();
     }
 
-    protected void setNomTable(String table) throws Exception {
-        if (table == null || table.isEmpty()) {
-            throw new Exception("Indiquer la table ou vous vouller travailler");
-        }
-        this.nomTable = table;
+    /**
+     * Déduit le nom de table SQL depuis un objet Java.
+     * Ex: new Article() → "article", new StockMovement() → "stock_movement"
+     */
+    protected static String tableNomDepuisClasse(Object obj) {
+        return toSnakeCase(obj.getClass().getSimpleName());
     }
 
+    // ── findAllData ───────────────────────────────────────────────────────────
+    /**
+     * Récupère toutes les lignes d'une table correspondant à la classe de l'objet.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> List<T> findAllData(T obj) throws Exception {
+        String table = tableNomDepuisClasse(obj);
+        Class<T> cls = (Class<T>) obj.getClass();
+        String sql = "SELECT * FROM " + table;
+        List<T> resultats = new ArrayList<>();
 
+        try (Connection conn = DbConnection.getInstance().getConnexion();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
 
-
-    protected void insererObjet(Object obj) throws Exception {
-        Class<?> objClass = obj.getClass();
-        Field[] champs = objClass.getDeclaredFields();
-
-        StringBuilder requete = new StringBuilder("INSERT INTO " + getNomTable() + " (");
-        for (int i = 0; i < champs.length; i++) {
-            requete.append(champs[i].getName()).append(",");
-        }
-        requete.deleteCharAt(requete.length() - 1);
-        requete.append(") VALUES (");
-        for (int i = 0; i < champs.length; i++) {
-            requete.append("?,");
-
-        }
-        requete.deleteCharAt(requete.length() - 1).append(")");
-
-        try (Connection conn = this.manaoConnexion().getConnexion();
-            PreparedStatement ps = conn.prepareStatement(requete.toString())) {
-
-            for (int i = 0; i < champs.length; i++) {
-                champs[i].setAccessible(true);
-                ps.setObject(i + 1, champs[i].get(obj));
+            Field[] champs = cls.getDeclaredFields();
+            while (rs.next()) {
+                T instance = cls.getDeclaredConstructor().newInstance();
+                for (Field champ : champs) {
+                    champ.setAccessible(true);
+                    String col = toSnakeCase(champ.getName());
+                    try {
+                        champ.set(instance, rs.getObject(col));
+                    } catch (Exception ignored) { /* colonne absente */ }
+                }
+                resultats.add(instance);
             }
-            ps.executeUpdate();
         }
-        this.manaoConnexion().close_serv();
+        System.out.println("[CRUD] findAllData → " + resultats.size() + " ligne(s) dans " + table);
+        return resultats;
     }
 
+    // ── read ──────────────────────────────────────────────────────────────────
+    /**
+     * Récupère une ligne par son id.
+     * Convention: la PK s'appelle "id" en BDD.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T read(T obj, int id) throws Exception {
+        String table = tableNomDepuisClasse(obj);
+        Class<T> cls = (Class<T>) obj.getClass();
+        String sql = "SELECT * FROM " + table + " WHERE id = ?";
 
+        try (Connection conn = DbConnection.getInstance().getConnexion();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-
-    protected String insererObjetAndGetId(Object obj) throws Exception
-    {
-        Class<?> objClass = obj.getClass();
-        Field[] champs = objClass.getDeclaredFields();
-
-        StringBuilder requete = new StringBuilder("INSERT INTO " + getNomTable() + " (");
-        for (int i = 0; i < champs.length; i++) {
-            requete.append(champs[i].getName()).append(",");
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    T instance = cls.getDeclaredConstructor().newInstance();
+                    for (Field champ : cls.getDeclaredFields()) {
+                        champ.setAccessible(true);
+                        String col = toSnakeCase(champ.getName());
+                        try {
+                            champ.set(instance, rs.getObject(col));
+                        } catch (Exception ignored) {}
+                    }
+                    System.out.println("[CRUD] read → id=" + id + " trouvé dans " + table);
+                    return instance;
+                }
+            }
         }
-        requete.deleteCharAt(requete.length() - 1);
-        requete.append(") VALUES (");
-        for (int i = 0; i < champs.length; i++) {
-            requete.append("?,");
+        System.out.println("[CRUD] read → id=" + id + " non trouvé dans " + table);
+        return null;
+    }
+
+    // ── findDataWithRequest ───────────────────────────────────────────────────
+    /**
+     * Récupère des lignes avec une clause WHERE libre.
+     * @param obj         instance de la classe cible (pour déduire la table et le type)
+     * @param whereClause ex: "WHERE name_method = 'FIFO' ORDER BY id"
+     */
+    @SuppressWarnings("unchecked")
+    public <T> List<T> findDataWithRequest(T obj, String whereClause) throws Exception {
+        String table = tableNomDepuisClasse(obj);
+        Class<T> cls = (Class<T>) obj.getClass();
+        String sql = "SELECT * FROM " + table
+                   + (whereClause != null && !whereClause.isBlank() ? " " + whereClause : "");
+        List<T> resultats = new ArrayList<>();
+
+        try (Connection conn = DbConnection.getInstance().getConnexion();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            Field[] champs = cls.getDeclaredFields();
+            while (rs.next()) {
+                T instance = cls.getDeclaredConstructor().newInstance();
+                for (Field champ : champs) {
+                    champ.setAccessible(true);
+                    String col = toSnakeCase(champ.getName());
+                    try {
+                        champ.set(instance, rs.getObject(col));
+                    } catch (Exception ignored) {}
+                }
+                resultats.add(instance);
+            }
         }
-        requete.deleteCharAt(requete.length() - 1).append(")");
+        System.out.println("[CRUD] findDataWithRequest → " + resultats.size() + " ligne(s) dans " + table);
+        return resultats;
+    }
 
-        String lastInsertId = "";
-        try (Connection conn = this.manaoConnexion().getConnexion();
-            PreparedStatement ps = conn.prepareStatement(requete.toString(), Statement.RETURN_GENERATED_KEYS)) {
+    // ── insertData ────────────────────────────────────────────────────────────
+    /**
+     * Insère un objet dans la table correspondante.
+     * Ignore le premier champ (id auto-généré).
+     * @return l'id généré, ou -1 si non disponible
+     */
+    public int insertData(Object obj) throws Exception {
+        String table = tableNomDepuisClasse(obj);
+        Field[] champs = obj.getClass().getDeclaredFields();
 
-            for (int i = 0; i < champs.length; i++) {
-                champs[i].setAccessible(true);
-                ps.setObject(i + 1, champs[i].get(obj));
+        StringBuilder cols = new StringBuilder();
+        StringBuilder vals = new StringBuilder();
+        List<Field> champsInserer = new ArrayList<>();
+
+        for (Field champ : champs) {
+            champ.setAccessible(true);
+            // Ignorer le champ id (premier champ, auto-généré)
+            if (champ.getName().equals("id")) continue;
+            // Si le type du champ est un objet métier → on stocke son id
+            Object valeur = champ.get(obj);
+            if (valeur != null && !isPrimitiveOrWrapper(valeur.getClass()) && !(valeur instanceof String)) {
+                // FK: on stocke id_ + snake_case du champ
+                if (cols.length() > 0) { cols.append(", "); vals.append(", "); }
+                cols.append("id_").append(toSnakeCase(champ.getName()));
+                vals.append("?");
+                champsInserer.add(champ); // on extrait l'id plus bas
+            } else {
+                if (cols.length() > 0) { cols.append(", "); vals.append(", "); }
+                cols.append(toSnakeCase(champ.getName()));
+                vals.append("?");
+                champsInserer.add(champ);
+            }
+        }
+
+        String sql = "INSERT INTO " + table + " (" + cols + ") VALUES (" + vals + ")";
+
+        try (Connection conn = DbConnection.getInstance().getConnexion();
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            int idx = 1;
+            for (Field champ : champsInserer) {
+                champ.setAccessible(true);
+                Object valeur = champ.get(obj);
+                if (valeur != null && !isPrimitiveOrWrapper(valeur.getClass()) && !(valeur instanceof String)) {
+                    // Extraire l'id de l'objet FK
+                    Field idField = valeur.getClass().getDeclaredField("id");
+                    idField.setAccessible(true);
+                    ps.setObject(idx++, idField.get(valeur));
+                } else {
+                    ps.setObject(idx++, valeur);
+                }
             }
             ps.executeUpdate();
 
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
-                    lastInsertId = rs.getString(1);
-                    System.out.println("Dans insererObjetAndGetId: "+lastInsertId);
+                    int genId = rs.getInt(1);
+                    System.out.println("[CRUD] insertData → id généré=" + genId + " dans " + table);
+                    return genId;
                 }
             }
         }
-        this.manaoConnexion().close_serv();
-        return lastInsertId;
+        System.out.println("[CRUD] insertData → insertion réussie dans " + table + " (pas d'id retourné)");
+        return -1;
     }
 
+    // ── update ────────────────────────────────────────────────────────────────
+    /**
+     * Met à jour une ligne par son id.
+     * Seuls les champs non-null (hors id) sont inclus dans le SET.
+     */
+    public void update(Object obj, int id) throws Exception {
+        String table = tableNomDepuisClasse(obj);
+        Field[] champs = obj.getClass().getDeclaredFields();
 
+        StringBuilder set = new StringBuilder();
+        List<Object> valeurs = new ArrayList<>();
 
-
-    protected <T> List<T> getAllDataObject(T object) throws Exception {
-        Class<T> objClass = (Class<T>) object.getClass();
-        String requete = "SELECT * FROM " + getNomTable();
-        List<T> resultats = new ArrayList<>();
-
-        try (Connection conn = this.manaoConnexion().getConnexion();
-            PreparedStatement ps = conn.prepareStatement(requete);
-            ResultSet rs = ps.executeQuery()) {
-
-            Field[] champs = objClass.getDeclaredFields();
-
-            while (rs.next()) {
-                T objet = objClass.getDeclaredConstructor().newInstance();
-                for (Field champ : champs) {
-                    champ.setAccessible(true);
-                    champ.set(objet, rs.getObject(champ.getName()));
-                }
-                resultats.add(objet);
-            }
-        }
-        this.manaoConnexion().close_serv();
-        return resultats;
-    }
-
-
-
-
-    protected <T> List<T> selectObjetRequete(T object, String whereClause) throws Exception {
-        Class<T> objClass = (Class<T>) object.getClass();
-        String query = "SELECT * FROM " + getNomTable();
-        
-        if (whereClause != null && !whereClause.trim().isEmpty()) {
-            query += " " + whereClause;
-        }
-        
-        List<T> resultats = new ArrayList<>();
-    
-        try (Connection conn = this.manaoConnexion().getConnexion();
-            PreparedStatement ps = conn.prepareStatement(query);
-            ResultSet rs = ps.executeQuery()) {
-    
-            Field[] champs = objClass.getDeclaredFields();
-    
-            while (rs.next()) {
-                T objet = objClass.getDeclaredConstructor().newInstance();
-                for (Field champ : champs) {
-                    champ.setAccessible(true);
-                    champ.set(objet, rs.getObject(champ.getName()));
-                }
-                resultats.add(objet);
-            }
-        }
-        this.manaoConnexion().close_serv();
-        return resultats;
-    }
-
-
-
-
-
-    protected List<Map<String, Object>> selectDataAvecConditionCalcul(String requete, String whereClause) throws Exception
-    {
-        String query = "SELECT " + requete + " FROM " + getNomTable();
-        
-        if (whereClause != null && !whereClause.trim().isEmpty()) {
-            query += " WHERE " + whereClause;
-        }
-        
-        List<Map<String, Object>> resultats = new ArrayList<>();
-    
-        try (Connection conn = this.manaoConnexion().getConnexion();
-             PreparedStatement ps = conn.prepareStatement(query);
-             ResultSet rs = ps.executeQuery()) {
-    
-            while (rs.next()) {
-                Map<String, Object> ligne = new HashMap<>();
-                ResultSetMetaData metaData = rs.getMetaData();
-                
-                for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                    String columnLabel = metaData.getColumnLabel(i);
-                    Object value = rs.getObject(columnLabel);
-                    ligne.put(columnLabel, value);
-                }
-    
-                resultats.add(ligne);
-            }
-        }
-        this.manaoConnexion().close_serv();
-        return resultats;
-    }
-    
-
-
-    
-
-    
-
-    public void delete(Object obj, String requete) throws Exception {
-        StringBuilder query = new StringBuilder("DELETE FROM " + getNomTable());
-    
-        if (requete != null && !requete.trim().isEmpty()) {
-            query.append(" ").append(requete);
-        }
-    
-        try (Connection conn = this.manaoConnexion().getConnexion();
-             PreparedStatement ps = conn.prepareStatement(query.toString())) {
-    
-            Class<?> objClass = obj.getClass();
-            Field[] champs = objClass.getDeclaredFields();
-    
-            int paramIndex = 1;
-            for (Field champ : champs) {
-                champ.setAccessible(true);
-                String fieldName = champ.getName();
-    
-                if (requete.contains(fieldName + " = ?")) {
-                    ps.setObject(paramIndex++, champ.get(obj));
-                }
-            }
-    
-            int rowsAffected = ps.executeUpdate();
-            System.out.println(rowsAffected + " effacer.");
-            this.manaoConnexion().close_serv();
-        }
-    }
-    
-
-    public void updateObjet(Object obj, String whereClause) throws Exception {
-        // Start building the UPDATE query
-        StringBuilder query = new StringBuilder("UPDATE " + getNomTable() + " SET ");
-        Class<?> objClass = obj.getClass();
-        Field[] champs = objClass.getDeclaredFields();
-    
-        // To keep track of parameters for the PreparedStatement
-        int paramIndex = 1;
-        boolean firstField = true;
-    
-        // Use a StringBuilder to dynamically build the query
-        for (int i = 0; i < champs.length; i++) {
-            Field champ = champs[i];
+        for (Field champ : champs) {
             champ.setAccessible(true);
-    
-            // Ignore the first column (primary key)
-            if (i == 0) {
-                continue; // Skip the first field (e.g., idOlona)
-            }
-    
-            // Only update fields that are set in the object
-            Object value = champ.get(obj);
-            if (value != null) {
-                if (!firstField) {
-                    query.append(", ");
-                }
-                query.append(champ.getName()).append(" = ?");
-                firstField = false;
+            if (champ.getName().equals("id")) continue;
+            Object valeur = champ.get(obj);
+            if (valeur == null) continue;
+
+            if (set.length() > 0) set.append(", ");
+
+            if (!isPrimitiveOrWrapper(valeur.getClass()) && !(valeur instanceof String)) {
+                // FK
+                set.append("id_").append(toSnakeCase(champ.getName())).append(" = ?");
+                Field idField = valeur.getClass().getDeclaredField("id");
+                idField.setAccessible(true);
+                valeurs.add(idField.get(valeur));
+            } else {
+                set.append(toSnakeCase(champ.getName())).append(" = ?");
+                valeurs.add(valeur);
             }
         }
-    
-        // Append the WHERE clause
-        query.append(" ").append(whereClause);
-    
-        // Now prepare the statement with the complete query
-        try (Connection conn = this.manaoConnexion().getConnexion();
-            PreparedStatement ps = conn.prepareStatement(query.toString())) {
-    
-            // Set parameters for fields that are not null
-            for (int i = 0; i < champs.length; i++) {
-                Field champ = champs[i];
-                champ.setAccessible(true);
-    
-                // Ignore the first column (primary key)
-                if (i == 0) {
-                    continue; // Skip the first field
-                }
-    
-                Object value = champ.get(obj);
-                if (value != null) {
-                    ps.setObject(paramIndex++, value);
-                }
-            }
-    
-            // Execute the update
-            int rowsAffected = ps.executeUpdate();
-            System.out.println(rowsAffected + " row(s) updated.");
+
+        if (set.length() == 0) {
+            System.out.println("[CRUD] update → aucun champ à mettre à jour dans " + table);
+            return;
         }
-    }           
+
+        String sql = "UPDATE " + table + " SET " + set + " WHERE id = ?";
+        valeurs.add(id);
+
+        try (Connection conn = DbConnection.getInstance().getConnexion();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            for (int i = 0; i < valeurs.size(); i++) {
+                ps.setObject(i + 1, valeurs.get(i));
+            }
+            int rows = ps.executeUpdate();
+            System.out.println("[CRUD] update → " + rows + " ligne(s) mise(s) à jour dans " + table + " (id=" + id + ")");
+        }
+    }
+
+    // ── delete ────────────────────────────────────────────────────────────────
+    /**
+     * Supprime une ligne par son id.
+     */
+    public void delete(Object obj, int id) throws Exception {
+        String table = tableNomDepuisClasse(obj);
+        String sql = "DELETE FROM " + table + " WHERE id = ?";
+
+        try (Connection conn = DbConnection.getInstance().getConnexion();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, id);
+            int rows = ps.executeUpdate();
+            System.out.println("[CRUD] delete → " + rows + " ligne(s) supprimée(s) dans " + table + " (id=" + id + ")");
+        }
+    }
+
+    // ── Utilitaire type ───────────────────────────────────────────────────────
+    private boolean isPrimitiveOrWrapper(Class<?> type) {
+        return type.isPrimitive()
+            || type == Integer.class   || type == int.class
+            || type == Long.class      || type == long.class
+            || type == Double.class    || type == double.class
+            || type == Float.class     || type == float.class
+            || type == Boolean.class   || type == boolean.class
+            || type == Byte.class      || type == byte.class
+            || type == Short.class     || type == short.class
+            || type == Character.class || type == char.class
+            || type == String.class
+            || java.util.Date.class.isAssignableFrom(type)
+            || java.sql.Timestamp.class.isAssignableFrom(type)
+            || java.sql.Date.class.isAssignableFrom(type);
+    }
 }

@@ -1,104 +1,98 @@
 package inventory.feature.repository.dao;
 
-import java.util.*;
+import java.util.List;
 
-// import javax.servlet.http.HttpSession;
+/**
+ * DAO générique.
+ * Hérite de GenericMethodCRUD et expose les opérations CRUD.
+ * Le nom de table est déduit automatiquement depuis la classe de l'objet (camelCase → snake_case).
+ * Plus besoin de passer un String table manuellement.
+ */
+public class GenericMethodDAO<T> extends GenericMethodCRUD {
 
-public class GenericMethodDAO<O> extends GenericMethodCRUD
-{
-    public GenericMethodDAO(){}
-    public void insertion(String table,Object objetInserer)
-    {
-        try
-        {
-            this.setNomTable(table);
-            this.insererObjet(objetInserer);
-            System.out.println("Succes insertion dans "+table);
+    public GenericMethodDAO() {}
+
+    // ── INSERT ────────────────────────────────────────────────────────────────
+    /**
+     * Insère un objet et retourne l'id généré (-1 si non disponible).
+     */
+    public int insert(T obj) {
+        try {
+            return this.insertData(obj);
         } catch (Exception e) {
-            System.out.println("Echec d'insertion");
+            System.err.println("[DAO] Échec d'insertion: " + e.getMessage());
             e.printStackTrace();
-            System.err.println(e.getMessage());
+            return -1;
         }
     }
 
-    public String recuperationDernierInsertion(String table, Object objetInserer)
-    {
-        String lastInsertId ="";
+    // ── SELECT ALL ────────────────────────────────────────────────────────────
+    /**
+     * Récupère toutes les lignes de la table correspondant à la classe de l'objet.
+     */
+    public List<T> findAll(T obj) {
         try {
-            this.setNomTable(table);
-            lastInsertId = this.insererObjetAndGetId(objetInserer);
-            System.out.println("Reussite de Id dernier= "+lastInsertId);
+            return this.findAllData(obj);
         } catch (Exception e) {
-            System.err.println(e.getMessage());
-        }
-        return lastInsertId;
-    }
-
-    public List<O> recuperationEntier(String table, O classes) throws Exception {
-        this.setNomTable(table);
-        List<O> resultaList = null;
-        try {
-            resultaList = this.getAllDataObject(classes);
-            if (resultaList == null) {
-                throw new Exception("Aucune donner dans "+table);
-            } else {
-                System.out.println("Recuperation bien fait dans "+table);
-            }
-        } catch (Exception e) {
-            System.out.println("Erreur de recuperation");
-            System.err.println(e.getMessage());
-        }
-        return resultaList;
-    }
-
-    public void miseAjour(String table,Object classe , String requeteUpdate) throws Exception
-    {
-        this.setNomTable(table);
-        try {
-            super.updateObjet(classe, requeteUpdate);
-            System.out.println("MISE A JOUR TERMINE dans "+table);
-        } catch (Exception e) {
-            // e.getMessage();
+            System.err.println("[DAO] Échec de findAll: " + e.getMessage());
             e.printStackTrace();
-            System.out.println("MISE A JOUR EN ECHEC dans "+table);
+            return null;
         }
     }
 
-    public List<O> recuperationAvecCondition(String table,O objet,String requeteConditionSelect) throws Exception
-    {
-        this.setNomTable(table);
-        List<O> resultaList = null;
-        try
-        {
-            resultaList= super.selectObjetRequete(objet, requeteConditionSelect);
-            System.out.println("SUCCES DE RECUPERATION DANS "+table);
-        } catch (Exception e) {
-            System.err.println("ECHEC DE RECUPERATION DANS= "+table);
-            System.err.println(e.getMessage());
-        }
-        return resultaList;
-    }
-
-
-    public List<Map<String, Object>> requeteUsageFonction(String table,String requete,String conditionFaculte) throws Exception
-    {
-        List<Map<String, Object>> resultats=null;
+    // ── SELECT BY ID ──────────────────────────────────────────────────────────
+    /**
+     * Récupère une ligne par son id.
+     */
+    public T findById(T obj, int id) {
         try {
-            resultats = super.selectDataAvecConditionCalcul(requete, conditionFaculte);
+            return this.read(obj, id);
         } catch (Exception e) {
-            throw new Exception("ECHEC DE REQUETE");
+            System.err.println("[DAO] Échec de findById id=" + id + ": " + e.getMessage());
+            e.printStackTrace();
+            return null;
         }
-        return resultats;
     }
 
-    public void suppression(String table,Object objet,String requete) throws Exception
-    {
+    // ── SELECT WITH FILTER ────────────────────────────────────────────────────
+    /**
+     * Récupère des lignes avec une clause SQL libre.
+     * @param whereClause ex: "WHERE name_method = 'FIFO' ORDER BY id"
+     */
+    public List<T> findWithFilter(T obj, String whereClause) {
         try {
-            this.setNomTable(table);
-            this.delete(objet, requete);
-            System.out.println("Suppression reussie.");
+            return this.findDataWithRequest(obj, whereClause);
         } catch (Exception e) {
-            throw new Exception("Echec de suppression: "+e.getMessage());
+            System.err.println("[DAO] Échec de findWithFilter: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    // ── UPDATE ────────────────────────────────────────────────────────────────
+    /**
+     * Met à jour une ligne par son id.
+     * Seuls les champs non-null (hors id) sont mis à jour.
+     */
+    public void updateById(T obj, int id) {
+        try {
+            this.update(obj, id);
+        } catch (Exception e) {
+            System.err.println("[DAO] Échec de updateById id=" + id + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    // ── DELETE ────────────────────────────────────────────────────────────────
+    /**
+     * Supprime une ligne par son id.
+     */
+    public void deleteById(T obj, int id) {
+        try {
+            this.delete(obj, id);
+        } catch (Exception e) {
+            System.err.println("[DAO] Échec de deleteById id=" + id + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }

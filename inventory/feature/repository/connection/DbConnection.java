@@ -2,56 +2,75 @@ package inventory.feature.repository.connection;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+import java.sql.SQLException;
 
+/**
+ * Gestion de la connexion à la base de données (Singleton).
+ * Attributs en lecture seule (get uniquement).
+ */
 public class DbConnection {
+
+    // ── Attributs de configuration ────────────────────────────────────────────
+    private final String driver;
+    private final String dbName;
+    private final String username;
+    private final String password;
+
+    // URL complète construite à partir des attributs
+    private static final String HOST = "localhost";
+    private static final String PORT = "5432";
+
+    // ── Singleton ─────────────────────────────────────────────────────────────
+    private static DbConnection instance;
     private Connection connexion;
-    private PreparedStatement preparedStatement;
-    private ResultSet result;
 
-    private static final String URL = "jdbc:postgresql://localhost:5432/inventory?charset=UTF-8";
-    private static final String USER="postgres";
-    private static final String PASSWORD="fanomezantsoa";
+    // ── Constructeur privé ────────────────────────────────────────────────────
+    private DbConnection() throws Exception {
+        this.driver   = "org.postgresql.Driver";
+        this.dbName   = "inventory";
+        this.username = "postgres";
+        this.password = "fanomezantsoa";
 
-    public PreparedStatement getPrepaStatement()
-    {
-    	return this.preparedStatement;
+        String url = "jdbc:postgresql://" + HOST + ":" + PORT + "/" + this.dbName;
+        Class.forName(this.driver);
+        this.connexion = DriverManager.getConnection(url, this.username, this.password);
+        System.out.println("[DbConnection] Connexion établie à la base: " + this.dbName);
     }
 
-    public void setPrepaStatement(PreparedStatement stateQuery)
-    {
-    	this.preparedStatement = stateQuery;
-    }
-
-    public Connection getConnexion()
-    {
-    	return this.connexion;
-    }
-
-    public void close_serv() throws Exception {
-        try {
-            if (this.preparedStatement != null) {
-                this.preparedStatement.close();
-            }
-        } catch (Exception e) {
-            // Gérer l'exception de fermeture de la déclaration
-            e.printStackTrace();
+    // ── Accès Singleton ───────────────────────────────────────────────────────
+    /**
+     * Retourne l'instance unique de DbConnection.
+     * Recrée la connexion si elle est fermée ou nulle.
+     */
+    public static DbConnection getInstance() throws Exception {
+        if (instance == null || instance.connexion == null || instance.connexion.isClosed()) {
+            instance = new DbConnection();
         }
-        try {
-            if (this.connexion != null) {
-                this.connexion.close();
-            }
-        } catch (Exception e) {
-            // Gérer l'exception de fermeture de la connexion
-            e.printStackTrace();
-        }
-        System.out.println("CLOSE REUSSIE");
+        return instance;
     }
 
-    public DbConnection() throws Exception {
-        Class.forName("org.postgresql.Driver");
-        this.connexion = DriverManager.getConnection(URL,USER,PASSWORD);
-        System.out.println("Bien connecter");
+    // ── Getters (lecture seule) ───────────────────────────────────────────────
+    public String getDriver()   { return driver;   }
+    public String getDbName()   { return dbName;   }
+    public String getUsername() { return username; }
+    public String getPassword() { return password; }
+
+    public Connection getConnexion() { return connexion; }
+
+    // ── Fermeture ─────────────────────────────────────────────────────────────
+    /**
+     * Ferme la connexion et réinitialise le Singleton.
+     */
+    public void close() {
+        try {
+            if (connexion != null && !connexion.isClosed()) {
+                connexion.close();
+                System.out.println("[DbConnection] Connexion fermée.");
+            }
+        } catch (SQLException e) {
+            System.err.println("[DbConnection] Erreur lors de la fermeture: " + e.getMessage());
+        } finally {
+            instance = null;
+        }
     }
 }

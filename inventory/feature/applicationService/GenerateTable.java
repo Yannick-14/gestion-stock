@@ -1,225 +1,240 @@
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.sql.*;
-import java.util.HashMap;
-import java.util.Map;
+package inventory.feature.applicationService;
 
+import inventory.feature.repository.connection.DbConnection;
+
+import java.lang.reflect.Field;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Génère et synchronise les tables SQL depuis les classes Java (migration).
+ *
+ * Convention de nommage:
+ *   - Classe Java (camelCase/PascalCase) → table SQL (snake_case)
+ *   - Champ Java (camelCase)             → colonne SQL (snake_case)
+ *   - Champ de type objet métier          → FK: "id_" + snake_case du champ
+ *   - Le premier champ nommé "id"         → SERIAL PRIMARY KEY
+ */
 public class GenerateTable {
 
-    private static final String DB_URL = "jdbc:postgresql://localhost:5432/fleur";
-    private static final String DB_USER = "postgres";
-    private static final String DB_PASSWORD = "fanomezantsoa";
+    // Tableau des classes à migrer (dans l'ordre des dépendances)
+    private final Class<?>[] classes;
 
-    public static void main(String[] args) {
-        try (Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-            // Générez des classes pour les tables
-            // generateClassFromTable(connection, "categorie", "table", "table");
-            // generateClassFromTable(connection, "fleurs", "table", "table");
-            // generateClassFromTable(connection, "prix", "table", "table");
-            // generateClassFromTable(connection, "administrateur", "table", "table");
-            // generateClassFromTable(connection, "panier", "table", "table");
-            // generateClassFromTable(connection, "commande", "table", "table");
-            // generateClassFromTable(connection, "client", "table", "table");
-            // generateClassFromTable(connection, "promotion", "table", "table");
-            // generateClassFromTable(connection, "promotionfleur", "table", "table");
-            // generateClassFromTable(connection, "detailscommande", "table", "table");
-            // generateClassFromTable(connection, "paiementcommande", "table", "table");
-            // generateClassFromTable(connection, "prixoffre", "table", "table");
-            // generateClassFromTable(connection, "remise", "table", "table");
-            
-            // Générez des classes pour les vues
-            // generateClassFromView(connection, "fleurinfo", "view", "view");
-            // generateClassFromView(connection, "promotioninfo", "view", "view");
-            // generateClassFromView(connection, "mespaniers", "view", "view");
-            generateClassFromView(connection, "listevente", "view", "view");
-            // generateClassFromView(connection, "historiqueprix", "view", "view");
+    public GenerateTable(Class<?>... classes) {
+        this.classes = classes;
+    }
 
-        } catch (SQLException | IOException e) {
+    // ── Point d'entrée de la migration ────────────────────────────────────────
+
+    /**
+     * Pour chaque classe: vérifie si la table existe, la crée ou la met à jour.
+     */
+    public void migrate() {
+        try {
+            Connection conn = DbConnection.getInstance().getConnexion();
+            System.out.println("═══════════════════════════════════════════");
+            System.out.println("       MIGRATION DE BASE DE DONNÉES        ");
+            System.out.println("═══════════════════════════════════════════");
+
+            for (Class<?> cls : classes) {
+                String nomTable = toSnakeCase(cls.getSimpleName());
+                System.out.println("\n[Table] " + nomTable + " ← " + cls.getSimpleName());
+
+                if (checkStateTable(conn, nomTable)) {
+                    System.out.println("  → Table existante, vérification des mises à jour...");
+                    updateStateTable(conn, cls);
+                } else {
+                    System.out.println("  → Table absente, création en cours...");
+                    createTable(conn, cls);
+                }
+            }
+
+            System.out.println("\n═══════════════════════════════════════════");
+            System.out.println("       MIGRATION TERMINÉE AVEC SUCCÈS      ");
+            System.out.println("═══════════════════════════════════════════");
+
+        } catch (Exception e) {
+            System.err.println("[GenerateTable] Erreur de migration: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    public static void generateClassFromTable(Connection connection, String tableName, String outputDir, String packageName)
-            throws SQLException, IOException {
-        DatabaseMetaData metaData = connection.getMetaData();
-        ResultSet columns = metaData.getColumns(null, null, tableName, null);
-        ResultSet primaryKeys = metaData.getPrimaryKeys(null, null, tableName);
+    // ── checkStateTable ───────────────────────────────────────────────────────
 
-        // Récupérer la clé primaire
-        String primaryKeyColumn = null;
-        if (primaryKeys.next()) {
-            primaryKeyColumn = primaryKeys.getString("COLUMN_NAME");
+    /**
+     * Vérifie si une table existe dans la base de données.
+     * @return true si la table existe, false sinon
+     */
+    public boolean checkStateTable(Connection conn, String nomTable) throws SQLException {
+        DatabaseMetaData meta = conn.getMetaData();
+        try (ResultSet rs = meta.getTables(null, null, nomTable, new String[]{"TABLE"})) {
+            return rs.next();
         }
+    }
 
-        // Stocker les colonnes et leurs types
-        Map<String, String> columnData = new HashMap<>();
-        while (columns.next()) {
-            String columnName = columns.getString("COLUMN_NAME");
-            String columnType = mapSQLTypeToJavaType(columns.getString("TYPE_NAME"));
-            columnData.put(columnName, columnType);
-        }
+    // ── updateStateTable ──────────────────────────────────────────────────────
 
-        // Générer la classe
-        StringBuilder classCode = new StringBuilder();
-        String className = capitalize(tableName.toLowerCase());  // Convertir tout en minuscules avant de capitaliser
+    /**
+     * Compare les champs Java avec les colonnes existantes en BDD.
+     * Ajoute les colonnes manquantes via ALTER TABLE ADD COLUMN.
+     */
+    public void updateStateTable(Connection conn, Class<?> cls) throws SQLException {
+        String nomTable = toSnakeCase(cls.getSimpleName());
+        List<String> colonnesExistantes = getColonnesExistantes(conn, nomTable);
 
-        // Ajouter le package
-        classCode.append("package ").append(packageName).append(";\n\n");
-
-        // Importations nécessaires
-        classCode.append("import java.util.*;\n");
-        classCode.append("import java.sql.*;\n\n");
-
-        // Définir la classe
-        classCode.append("public class ").append(className).append(" {\n\n");
-
-        // Ajouter les attributs
-        for (Map.Entry<String, String> entry : columnData.entrySet()) {
-            classCode.append("    private ").append(entry.getValue()).append(" ").append(entry.getKey()).append(";\n");
-        }
-
-        if (primaryKeyColumn != null) {
-            // Constructeur par défaut
-            classCode.append("\n    public ").append(className).append("() {\n    }\n\n");
-
-            // Constructeur avec tous les attributs sauf la clé primaire
-            classCode.append("    public ").append(className).append("(");
-            boolean first = true;
-            for (Map.Entry<String, String> entry : columnData.entrySet()) {
-                if (!entry.getKey().equals(primaryKeyColumn)) {
-                    if (!first) {
-                        classCode.append(", ");
-                    }
-                    classCode.append(entry.getValue()).append(" ").append(entry.getKey());
-                    first = false;
+        for (Field champ : cls.getDeclaredFields()) {
+            String nomColonne = getNomColonne(champ);
+            if (!colonnesExistantes.contains(nomColonne)) {
+                String typeSql = getSqlType(champ);
+                String sql = "ALTER TABLE " + nomTable + " ADD COLUMN " + nomColonne + " " + typeSql;
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute(sql);
+                    System.out.println("  [ALTER] Colonne ajoutée: " + nomColonne + " (" + typeSql + ")");
                 }
             }
-            classCode.append(") {\n");
-            for (Map.Entry<String, String> entry : columnData.entrySet()) {
-                if (!entry.getKey().equals(primaryKeyColumn)) {
-                    classCode.append("        this.set").append(capitalize(entry.getKey()))
-                            .append("(").append(entry.getKey()).append(");\n");
-                }
-            }
-            classCode.append("    }\n\n");
+        }
+    }
 
-            // Getters et Setters
-            for (Map.Entry<String, String> entry : columnData.entrySet()) {
-                String attributeName = entry.getKey();
-                String attributeType = entry.getValue();
-                classCode.append("    public ").append(attributeType).append(" get").append(capitalize(attributeName))
-                        .append("() {\n        return ").append(attributeName).append(";\n    }\n\n");
-                classCode.append("    public void set").append(capitalize(attributeName)).append("(").append(attributeType)
-                        .append(" ").append(attributeName).append(") {\n        this.").append(attributeName).append(" = ")
-                        .append(attributeName).append(";\n    }\n\n");
+    // ── createTable ───────────────────────────────────────────────────────────
+
+    /**
+     * Crée la table SQL correspondant à la classe Java.
+     * - id → SERIAL PRIMARY KEY
+     * - champ objet métier → id_<champ> INT REFERENCES <table_cible>(id)
+     * - String → VARCHAR(255)
+     * - int/Integer → INT
+     * - double/Double → DOUBLE PRECISION
+     * - Timestamp/Date → TIMESTAMP
+     */
+    public void createTable(Connection conn, Class<?> cls) throws SQLException {
+        String nomTable = toSnakeCase(cls.getSimpleName());
+        Field[] champs = cls.getDeclaredFields();
+
+        StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS ");
+        sql.append(nomTable).append(" (\n");
+
+        List<String> fkLines = new ArrayList<>();
+
+        for (int i = 0; i < champs.length; i++) {
+            Field champ = champs[i];
+            String nomColonne = getNomColonne(champ);
+            String typeSql   = getSqlType(champ);
+
+            sql.append("  ").append(nomColonne).append(" ").append(typeSql);
+
+            // FK: si champ de type objet métier
+            if (isMetierType(champ.getType())) {
+                String tableRef = toSnakeCase(champ.getType().getSimpleName());
+                fkLines.add("  FOREIGN KEY (" + nomColonne + ") REFERENCES " + tableRef + "(id)");
             }
+
+            sql.append(",\n");
+        }
+
+        // Ajouter les FK à la fin
+        if (fkLines.isEmpty()) {
+            // Supprimer la dernière virgule
+            int idx = sql.lastIndexOf(",\n");
+            if (idx >= 0) sql.delete(idx, idx + 2).append("\n");
         } else {
-            // Si pas de clé primaire
-            for (Map.Entry<String, String> entry : columnData.entrySet()) {
-                String attributeName = entry.getKey();
-                String attributeType = entry.getValue();
-                classCode.append("    public ").append(attributeType).append(" get").append(capitalize(attributeName))
-                        .append("() {\n        return ").append(attributeName).append(";\n    }\n\n");
-                classCode.append("    public void set").append(capitalize(attributeName)).append("(").append(attributeType)
-                        .append(" ").append(attributeName).append(") {\n        this.").append(attributeName).append(" = ")
-                        .append(attributeName).append(";\n    }\n\n");
+            for (int i = 0; i < fkLines.size(); i++) {
+                sql.append(fkLines.get(i));
+                if (i < fkLines.size() - 1) sql.append(",\n");
+                else sql.append("\n");
             }
         }
 
-        classCode.append("}");
+        sql.append(")");
 
-        // Écrire le code dans un fichier
-        String filePath = outputDir + "/" + className + ".java";
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-            writer.write(classCode.toString());
-        }
-
-        System.out.println("Classe générée avec succès : " + filePath);
-    }
-
-
-    public static void generateClassFromView(Connection connection, String viewName, String outputDir, String packageName)
-            throws SQLException, IOException {
-        DatabaseMetaData metaData = connection.getMetaData();
-        ResultSet columns = metaData.getColumns(null, null, viewName, null);
-
-        // Stocker les colonnes et leurs types
-        Map<String, String> columnData = new HashMap<>();
-        while (columns.next()) {
-            String columnName = columns.getString("COLUMN_NAME");
-            String columnType = mapSQLTypeToJavaType(columns.getString("TYPE_NAME"));
-            columnData.put(columnName, columnType);
-        }
-
-        // Générer la classe
-        StringBuilder classCode = new StringBuilder();
-        String className = capitalize(viewName.toLowerCase());  // Convertir tout en minuscules avant de capitaliser
-
-        // Ajouter le package
-        classCode.append("package ").append(packageName).append(";\n\n");
-
-        // Importations nécessaires
-        classCode.append("import java.util.*;\n");
-        classCode.append("import java.sql.*;\n\n");
-
-        // Définir la classe
-        classCode.append("public class ").append(className).append(" {\n\n");
-
-        // Ajouter les attributs
-        for (Map.Entry<String, String> entry : columnData.entrySet()) {
-            classCode.append("    private ").append(entry.getValue()).append(" ").append(entry.getKey()).append(";\n");
-        }
-
-        // Getters
-        for (Map.Entry<String, String> entry : columnData.entrySet()) {
-            String attributeName = entry.getKey();
-            String attributeType = entry.getValue();
-            classCode.append("    public ").append(attributeType).append(" get").append(capitalize(attributeName))
-                    .append("() {\n        return ").append(attributeName).append(";\n    }\n\n");
-        }
-
-        classCode.append("}");
-
-        // Écrire le code dans un fichier
-        String filePath = outputDir + "/" + className + ".java";
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-            writer.write(classCode.toString());
-        }
-
-        System.out.println("Classe générée avec succès : " + filePath);
-    }
-
-    private static String mapSQLTypeToJavaType(String sqlType) {
-        switch (sqlType.toLowerCase()) {
-            case "varchar":
-            case "text":
-                return "String";
-            case "int":
-            case "integer": // Add proper case for PostgreSQL
-            case "serial": 
-            case "numeric":
-                return "int";
-            case "double precision":
-                return "double";
-            case "boolean":
-                return "boolean";
-            case "date":
-                return "java.util.Date";
-            case "timestamp":
-                return "java.sql.Timestamp";
-            case "bytea":
-            case "blob":
-                return "byte[]";
-            default:
-                return "double";
+        System.out.println("  [SQL] " + sql.toString().replace("\n", " "));
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute(sql.toString());
+            System.out.println("  [OK] Table créée: " + nomTable);
         }
     }
 
-    private static String capitalize(String str) {
-        if (str == null || str.isEmpty()) {
-            return str;
+    // ── Helpers privés ────────────────────────────────────────────────────────
+
+    private List<String> getColonnesExistantes(Connection conn, String nomTable) throws SQLException {
+        List<String> colonnes = new ArrayList<>();
+        DatabaseMetaData meta = conn.getMetaData();
+        try (ResultSet rs = meta.getColumns(null, null, nomTable, null)) {
+            while (rs.next()) {
+                colonnes.add(rs.getString("COLUMN_NAME").toLowerCase());
+            }
         }
-        return str.substring(0, 1).toUpperCase() + str.substring(1);
+        return colonnes;
+    }
+
+    /**
+     * Retourne le nom de colonne SQL pour un champ Java.
+     * - Champ "id"            → "id"
+     * - Champ objet métier    → "id_" + snake_case
+     * - Autres               → snake_case du nom de champ
+     */
+    private String getNomColonne(Field champ) {
+        if (champ.getName().equals("id")) return "id";
+        if (isMetierType(champ.getType())) {
+            return "id_" + toSnakeCase(champ.getName());
+        }
+        return toSnakeCase(champ.getName());
+    }
+
+    /**
+     * Retourne le type SQL correspondant au type Java du champ.
+     */
+    private String getSqlType(Field champ) {
+        if (champ.getName().equals("id")) return "SERIAL PRIMARY KEY";
+
+        Class<?> type = champ.getType();
+
+        if (isMetierType(type))                    return "INT";
+        if (type == String.class)                  return "VARCHAR(255)";
+        if (type == int.class || type == Integer.class) return "INT";
+        if (type == long.class || type == Long.class)   return "BIGINT";
+        if (type == double.class || type == Double.class
+         || type == float.class  || type == Float.class) return "DOUBLE PRECISION";
+        if (type == boolean.class || type == Boolean.class) return "BOOLEAN";
+        if (type == java.sql.Timestamp.class
+         || type == java.time.LocalDateTime.class)  return "TIMESTAMP";
+        if (type == java.sql.Date.class
+         || type == java.util.Date.class
+         || type == java.time.LocalDate.class)      return "DATE";
+        if (type == byte[].class)                  return "BYTEA";
+
+        return "TEXT"; // fallback
+    }
+
+    /**
+     * Vérifie si un type est un objet métier (ni primitif, ni String, ni date Java standard).
+     */
+    private boolean isMetierType(Class<?> type) {
+        if (type.isPrimitive()) return false;
+        if (type == String.class) return false;
+        if (Number.class.isAssignableFrom(type)) return false;
+        if (type == Boolean.class) return false;
+        if (java.util.Date.class.isAssignableFrom(type)) return false;
+        if (java.sql.Date.class.isAssignableFrom(type)) return false;
+        if (java.sql.Timestamp.class.isAssignableFrom(type)) return false;
+        if (type == java.time.LocalDate.class || type == java.time.LocalDateTime.class) return false;
+        if (type.getName().startsWith("java.")) return false;
+        return true; // c'est un objet métier → FK
+    }
+
+    /**
+     * Convertit un nom camelCase/PascalCase en snake_case.
+     * Ex: "stockManagementMethod" → "stock_management_method"
+     */
+    public static String toSnakeCase(String name) {
+        if (name == null || name.isEmpty()) return name;
+        return name
+            .replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2")
+            .replaceAll("([a-z])([A-Z])", "$1_$2")
+            .toLowerCase();
     }
 }
