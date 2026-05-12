@@ -37,17 +37,14 @@ public class StockManager {
 
         if (method.contains("cump")) {
             double totalValue = batches.stream().mapToDouble(b -> b.quantity * b.price).sum();
-            double cump = totalValue / totalAvailable;
+            double cump = totalQtyToValue(batches) / (double) totalAvailable;
             
             StockMovement m = new StockMovement(article, exitRequest.getTypeStockMovement(), exitRequest.getQuantity(), cump);
             m.setTransactionRef(ref);
             results.add(m);
         } else {
-            // FIFO ou LIFO
             if (method.contains("lifo")) {
-                Collections.reverse(batches); // Les derniers arrivés d'abord
-            } else {
-                // FIFO par défaut (déjà trié par date via resolveBatches)
+                Collections.reverse(batches);
             }
 
             for (Batch batch : batches) {
@@ -65,10 +62,30 @@ public class StockManager {
         return results;
     }
 
+    private double totalQtyToValue(List<Batch> batches) {
+        return batches.stream().mapToDouble(b -> b.quantity * b.price).sum();
+    }
+
+    /**
+     * Calcule l'état actuel du stock (Qté et Valeur) pour un article.
+     */
+    public StockState calculateStockState(Article article, List<StockMovement> allMvmts) {
+        List<Batch> batches = resolveBatches(article, allMvmts);
+        int totalQty = batches.stream().mapToInt(b -> b.quantity).sum();
+        double totalValue = totalQtyToValue(batches);
+        
+        return new StockState(totalQty, totalValue);
+    }
+
+    public static class StockState {
+        public final int quantity;
+        public final double totalValue;
+        public StockState(int q, double v) { this.quantity = q; this.totalValue = v; }
+    }
+
     private List<Batch> resolveBatches(Article article, List<StockMovement> allMvmts) {
         List<Batch> batches = new ArrayList<>();
-        
-        // On récupère uniquement les mouvements de cet article, triés par date
+
         List<StockMovement> articleMvmts = allMvmts.stream()
             .filter(m -> m.getArticle() != null && m.getArticle().getId() == article.getId())
             .sorted(Comparator.comparing(StockMovement::getCreatedAt))
@@ -81,7 +98,6 @@ public class StockManager {
             if (type.contains("entr")) {
                 batches.add(new Batch(m.getQuantity(), m.getUnitPrice()));
             } else {
-                // Pour une sortie, on réduit les batches selon FIFO (par défaut ici)
                 int toReduce = m.getQuantity();
                 Iterator<Batch> it = batches.iterator();
                 while (it.hasNext() && toReduce > 0) {

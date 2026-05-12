@@ -1,6 +1,7 @@
 package inventory.ui.screen;
 
 import inventory.feature.repository.dao.GenericMethodCRUD;
+import inventory.feature.stock.StockManager;
 import inventory.models.Article;
 import inventory.models.StockMovement;
 import inventory.ui.components.button.Button;
@@ -21,6 +22,7 @@ import java.util.List;
 public class HomeScreen extends JPanel {
 
     private final GenericMethodCRUD crud = new GenericMethodCRUD();
+    private final StockManager stockManager = new StockManager();
     private PanelList<Article> articlesList;
     private PanelList<StockMovement> movementsList;
     private List<StockMovement> allMovements;
@@ -60,13 +62,21 @@ public class HomeScreen extends JPanel {
             new TableFilter("nameArticle", "Nom")
         );
 
+        this.allMovements = loadMovements();
+
         List<CustomColumn<Article>> customColumns = List.of(
+            new CustomColumn<Article>() {
+                @Override public String getName() { return "Méthode"; }
+                @Override public Object getValue(Article a) { 
+                    return a.getStockManagementMethod() != null ? a.getStockManagementMethod().getNameMethod() : "CUMP"; 
+                }
+            },
             createStockBalanceColumn(),
+            createStockValueColumn(),
             createViewMovementsButtonColumn()
         );
 
         List<Article> articles = loadArticles();
-        this.allMovements = loadMovements(); // Charger tous les mouvements au début
 
         this.articlesList = new PanelList<>(new Article(), articles, filters, customColumns);
         panel.add(articlesList, BorderLayout.CENTER);
@@ -77,12 +87,11 @@ public class HomeScreen extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(0, 6));
         panel.setOpaque(false);
 
-        JLabel lbl = new JLabel("Mouvements de stock");
+        JLabel lbl = new JLabel("Mouvements de stock récents");
         lbl.setFont(new Font("Segoe UI", Font.BOLD, 16));
         lbl.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         panel.add(lbl, BorderLayout.NORTH);
 
-        // Filtres pour les mouvements : par article et par type
         List<TableFilter> filters = Arrays.asList(
             new TableFilter("article",            "Article"),
             new TableFilter("typeStockMovement",  "Type")
@@ -99,7 +108,6 @@ public class HomeScreen extends JPanel {
         try {
             return crud.findAllData(new Article());
         } catch (Exception e) {
-            System.err.println("[HomeScreen] Impossible de charger les articles : " + e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -108,97 +116,57 @@ public class HomeScreen extends JPanel {
         try {
             return crud.findAllData(new StockMovement());
         } catch (Exception e) {
-            System.err.println("[HomeScreen] Impossible de charger les mouvements : " + e.getMessage());
             return new ArrayList<>();
         }
     }
 
     private CustomColumn<Article> createStockBalanceColumn() {
         return new CustomColumn<Article>() {
-            @Override
-            public String getName() {
-                return "Stock Actuel";
+            @Override public String getName() { return "Qte Stock"; }
+            @Override public Object getValue(Article article) {
+                if (article.getId() == 0) return 0;
+                StockManager.StockState state = stockManager.calculateStockState(article, allMovements);
+                return state.quantity;
             }
+        };
+    }
 
-            @Override
-            public Object getValue(Article article) {
-                if (article.getId() == 0) return "0";
-                try {
-                    int balance = calculateStockBalance(article.getId());
-                    return balance;
-                } catch (Exception e) {
-                    return "?";
-                }
+    private CustomColumn<Article> createStockValueColumn() {
+        return new CustomColumn<Article>() {
+            @Override public String getName() { return "Valeur Totale"; }
+            @Override public Object getValue(Article article) {
+                if (article.getId() == 0) return "0.00 Ar";
+                StockManager.StockState state = stockManager.calculateStockState(article, allMovements);
+                return String.format("%.2f Ar", state.totalValue);
             }
         };
     }
 
     private CustomColumn<Article> createViewMovementsButtonColumn() {
         return new CustomColumn<Article>() {
-            @Override
-            public String getName() {
-                return "Mouvements";
-            }
-
-            @Override
-            public Object getValue(Article article) {
-                return "Voir";
-            }
-
-            @Override
-            public boolean isButtonColumn() {
-                return true;
-            }
-
-            @Override
-            public Button.Style getButtonStyle() {
-                return Button.Style.SECONDARY;
-            }
-
-            @Override
-            public void onButtonClick(Article article) {
-                showMovementsForArticle(article);
-            }
+            @Override public String getName() { return "Mouvements"; }
+            @Override public Object getValue(Article article) { return "Voir"; }
+            @Override public boolean isButtonColumn() { return true; }
+            @Override public Button.Style getButtonStyle() { return Button.Style.SECONDARY; }
+            @Override public void onButtonClick(Article article) { showMovementsForArticle(article); }
         };
     }
 
     public void showMovementsForArticle(Article article) {
         if (article == null) return;
+        List<StockMovement> filtered = allMovements.stream()
+            .filter(m -> m.getArticle() != null && m.getArticle().getId() == article.getId())
+            .toList();
         
-        List<StockMovement> filtered = new ArrayList<>();
-        for (StockMovement m : allMovements) {
-            if (m.getArticle() != null && m.getArticle().getId() == article.getId()) {
-                filtered.add(m);
-            }
-        }
-        
-        // Créer une fenêtre (JDialog) pour afficher les mouvements
         Window parentWindow = SwingUtilities.getWindowAncestor(this);
         JDialog dialog = new JDialog(parentWindow instanceof Frame ? (Frame) parentWindow : null, 
-            "Mouvements de stock : " + article.getNameArticle(), true);
+            "Mouvements : " + article.getNameArticle(), true);
         dialog.setSize(900, 500);
         dialog.setLocationRelativeTo(this);
         dialog.setLayout(new BorderLayout());
         
-        // Utiliser PanelList à l'intérieur du dialogue (sans filtres pour la simplicité, ou avec filtres si on veut)
         PanelList<StockMovement> list = new PanelList<>(new StockMovement(), filtered);
         dialog.add(list, BorderLayout.CENTER);
-        
         dialog.setVisible(true);
-    }
-
-    private int calculateStockBalance(int articleId) {
-        int balance = 0;
-        for (StockMovement m : allMovements) {
-            if (m.getArticle() != null && m.getArticle().getId() == articleId) {
-                String type = m.getTypeStockMovement() != null ? m.getTypeStockMovement().getNameType().toLowerCase() : "";
-                if (type.contains("entr")) {
-                    balance += m.getQuantity();
-                } else if (type.contains("sort")) {
-                    balance -= m.getQuantity();
-                }
-            }
-        }
-        return balance;
     }
 }
