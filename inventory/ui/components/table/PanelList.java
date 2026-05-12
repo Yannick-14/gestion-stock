@@ -126,8 +126,8 @@ public class PanelList<T> extends JPanel {
 
         JTableHeader header = table.getTableHeader();
         header.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        header.setBackground(new Color(52, 120, 246));
-        header.setForeground(Color.WHITE);
+        header.setBackground(Color.WHITE);
+        header.setForeground(Color.GRAY);
         header.setReorderingAllowed(false);
     }
 
