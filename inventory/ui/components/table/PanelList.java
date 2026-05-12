@@ -4,8 +4,10 @@ import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.lang.reflect.Field;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Date;
 
 /**
  * Composant tableau générique.
@@ -17,30 +19,31 @@ import java.util.List;
  */
 public class PanelList<T> extends JPanel {
 
-    private final Class<T>      modelClass;
-    private final String[]      columnNames;
-    private final Field[]       fields;       // champs de la classe (hors id)
+    private final Class<T> modelClass;
+    private final String[] columnNames;
+    private final Field[] fields;
 
-    private DefaultTableModel   tableModel;
-    private JTable              table;
-    private List<T>             allData;
+    private DefaultTableModel tableModel;
+    private JTable table;
+    private List<T> allData;
 
-    // Composants filtre
-    private final List<TableFilter>   filters;
-    private final List<JComponent>    filterInputs = new ArrayList<>();
+    private final List<TableFilter> filters;
+    private final List<JComponent> filterInputs = new ArrayList<>();
+
+    private static final SimpleDateFormat DATETIME_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm");
 
     @SuppressWarnings("unchecked")
     public PanelList(T prototype, List<T> data, List<TableFilter> filters) {
         this.modelClass = (Class<T>) prototype.getClass();
-        this.allData    = new ArrayList<>(data);
-        this.filters    = filters != null ? filters : new ArrayList<>();
+        this.allData = new ArrayList<>(data);
+        this.filters = filters != null ? filters : new ArrayList<>();
 
         // Extraire les champs (hors id)
         List<Field> visibleFields = new ArrayList<>();
         for (Field f : modelClass.getDeclaredFields()) {
             if (!f.getName().equals("id")) visibleFields.add(f);
         }
-        this.fields      = visibleFields.toArray(new Field[0]);
+        this.fields = visibleFields.toArray(new Field[0]);
         this.columnNames = buildColumnNames();
 
         setLayout(new BorderLayout(0, 8));
@@ -59,7 +62,6 @@ public class PanelList<T> extends JPanel {
     }
 
     // ── Construction des noms de colonnes ─────────────────────────────────────
-
     private String[] buildColumnNames() {
         String[] names = new String[fields.length];
         for (int i = 0; i < fields.length; i++) {
@@ -148,13 +150,27 @@ public class PanelList<T> extends JPanel {
                 fields[i].setAccessible(true);
                 try {
                     Object val = fields[i].get(item);
-                    row[i] = val != null ? val.toString() : "";
+                    row[i] = formatCellValue(val);
                 } catch (IllegalAccessException e) {
                     row[i] = "";
                 }
             }
             tableModel.addRow(row);
         }
+    }
+
+    // formater la valeur d'une cellule de table data
+    private String formatCellValue(Object value) {
+        if (value == null) {
+            return "";
+        }
+
+        // Formater les dates
+        if (value instanceof Date) {
+            return DATETIME_FORMAT.format((Date) value);
+        }
+        
+        return value.toString();
     }
 
     // ── Filtrage ──────────────────────────────────────────────────────────────
@@ -194,7 +210,10 @@ public class PanelList<T> extends JPanel {
             Field f = modelClass.getDeclaredField(fieldName);
             f.setAccessible(true);
             Object val = f.get(item);
-            return val != null ? val.toString() : "";
+            
+            if (val == null) return "";
+            
+            return formatCellValue(val);
         } catch (Exception e) {
             return "";
         }

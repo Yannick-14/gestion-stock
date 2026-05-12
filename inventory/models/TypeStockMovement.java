@@ -23,6 +23,6 @@ public class TypeStockMovement {
 
     @Override
     public String toString() {
-        return "TypeStockMovement{id=" + id + ", nameType='" + nameType + "'}";
+        return nameType;
     }
 }

@@ -49,7 +49,7 @@ public abstract class AbstractFormScreen<T> extends JPanel {
      * Méthode abstraite à implémenter pour définir la logique d'enregistrement.
      * Chaque écran doit fournir sa propre implémentation de save.
      */
-    protected abstract void saveArticle();
+    protected abstract void saveData();
 
     /**
      * Réinitialise le formulaire avec les valeurs par défaut.
@@ -116,7 +116,7 @@ public abstract class AbstractFormScreen<T> extends JPanel {
         actionPanel.add(Box.createHorizontalStrut(8));
         
         // Bouton Enregistrer (style PRIMARY)
-        addAction("Enregistrer", Button.Style.PRIMARY, e -> saveArticle());
+        addAction("Enregistrer", Button.Style.PRIMARY, e -> saveData());
     }
 
     /**

@@ -17,9 +17,9 @@ public class Article {
     public Article() {}
 
     public Article(String nameArticle, StockManagementMethod stockManagementMethod) {
-        this.nameArticle           = nameArticle;
+        this.nameArticle = nameArticle;
         this.stockManagementMethod = stockManagementMethod;
-        this.createdAt             = new Timestamp(System.currentTimeMillis());
+        this.createdAt = new Timestamp(System.currentTimeMillis());
     }
 
     public int getId() { return id; }
@@ -38,8 +38,6 @@ public class Article {
 
     @Override
     public String toString() {
-        return "Article{id=" + id + ", nameArticle='" + nameArticle
-             + "', method=" + (stockManagementMethod != null ? stockManagementMethod.getNameMethod() : "null")
-             + ", createdAt=" + createdAt + "}";
+        return nameArticle;
     }
 }

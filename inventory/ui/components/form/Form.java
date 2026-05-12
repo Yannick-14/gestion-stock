@@ -11,25 +11,12 @@ import java.util.*;
 
 /**
  * Formulaire générique COMPLÈTEMENT DYNAMIQUE.
- * 
- * Plus besoin de passer les options en paramètre !
- * 
- * Fonctionne ainsi :
- *  1. Analyse les propriétés de la classe
- *  2. Détecte si un champ est un objet (ex: StockManagementMethod)
- *  3. Charge automatiquement la liste via GenericMethodCRUD
- *  4. Crée le champ approprié (FieldInput ou FieldSelect)
- * 
- * Usage :
- *   Article article = new Article();  // Instance, pas la classe !
- *   Form<Article> form = new Form<>(article);
  */
 public class Form<T> extends JPanel {
     private final Class<T> modelClass;
     private final GenericMethodCRUD crud;
     private T instance;
     private final Map<String, JPanel> fields = new LinkedHashMap<>();
-
 
     public Form(T instance) {
         this.modelClass = (Class<T>) instance.getClass();
@@ -41,12 +28,6 @@ public class Form<T> extends JPanel {
         buildForm();
     }
 
-    /**
-     * Constructeur avec classe (compatibilité rétroactive)
-     * Utilise la réflexion pour créer une instance temporaire
-     * @param modelClass La classe à analyser (ex: Article.class)
-     * @deprecated Préférer new Form(new Article()) pour la clarté
-     */
     @Deprecated
     public Form(Class<T> modelClass) {
         this.modelClass = modelClass;
@@ -63,10 +44,6 @@ public class Form<T> extends JPanel {
         buildForm();
     }
 
-    /**
-     * Constructeur avec classe et options (ancien style, compatibilité)
-     * @deprecated Utiliser new Form(new Article()) à la place
-     */
     @Deprecated
     public Form(Class<T> modelClass, Map<String, List<?>> options) {
         this.modelClass = modelClass;
@@ -81,13 +58,8 @@ public class Form<T> extends JPanel {
         setOpaque(false);
         
         buildForm();
-        
-        // Les options sont ignorées, on utilise la détection automatique
     }
 
-    /**
-     * Construit le formulaire en analysant dynamiquement les propriétés
-     */
     private void buildForm() {
         Field[] declaredFields = modelClass.getDeclaredFields();
         
@@ -95,7 +67,6 @@ public class Form<T> extends JPanel {
             String fieldName = field.getName();
             String fieldLabel = formatLabel(fieldName);
             
-            // Ignorer certains champs
             if (shouldIgnoreField(fieldName)) {
                 continue;
             }
@@ -108,15 +79,10 @@ public class Form<T> extends JPanel {
         }
     }
 
-    /**
-     * Crée le champ approprié selon le type du field
-     */
     private JPanel createField(Field field, String label) {
         Class<?> fieldType = field.getType();
         
-        // Est-ce que ce field est un objet (classe personnalisée) ?
         if (isCustomObject(fieldType)) {
-            // Charger les données pour ce type
             List<?> items = loadDataForType(fieldType);
             
             if (!items.isEmpty()) {
@@ -124,13 +90,9 @@ public class Form<T> extends JPanel {
             }
         }
         
-        // Sinon c'est un champ texte simple
         return createInputField(label);
     }
 
-    /**
-     * Vérifie si un type est un objet métier (pas String, int, etc.)
-     */
     private boolean isCustomObject(Class<?> clazz) {
         return !clazz.isPrimitive()
             && !clazz.equals(String.class)
@@ -143,16 +105,9 @@ public class Form<T> extends JPanel {
             && !clazz.equals(java.util.Date.class);
     }
 
-    /**
-     * Charge les données pour un type donné
-     * Crée une instance temporaire du type et récupère tous les enregistrements
-     */
     private List<?> loadDataForType(Class<?> typeClass) {
         try {
-            // Créer une instance temporaire du type
             Object tempInstance = typeClass.getDeclaredConstructor().newInstance();
-            
-            // Utiliser CRUD pour charger tous les enregistrements de ce type
             return crud.findAllData(tempInstance);
         } catch (Exception e) {
             System.err.println("[Form] Erreur lors du chargement des données pour " + typeClass.getName() + " : " + e.getMessage());
@@ -160,22 +115,17 @@ public class Form<T> extends JPanel {
         }
     }
 
-    /**
-     * Crée un FieldSelect avec la liste chargée
-     */
     private JPanel createSelectField(String label, List<?> items) {
         return new FieldSelect<>(label, items);
     }
 
-    /**
-     * Crée un FieldInput pour un champ texte
-     */
     private JPanel createInputField(String label) {
         return new FieldInput(label);
     }
 
     /**
      * Remplit l'objet avec les données du formulaire
+     * AVEC CONVERSION DE TYPES
      */
     public T getData(T targetInstance) throws IllegalAccessException {
         for (Map.Entry<String, JPanel> entry : fields.entrySet()) {
@@ -192,14 +142,21 @@ public class Form<T> extends JPanel {
                 value = fieldSelect.getSelectedValue();
             }
 
-            // Utiliser la réflexion pour setter le champ
+            // Utiliser la réflexion pour setter le champ avec conversion de type
             if (value != null && !value.toString().isEmpty()) {
                 try {
                     Field field = modelClass.getDeclaredField(fieldName);
                     field.setAccessible(true);
-                    field.set(targetInstance, value);
+                    
+                    // Convertir la valeur selon le type du champ
+                    Object convertedValue = convertValue(value, field.getType());
+                    field.set(targetInstance, convertedValue);
+                    
                 } catch (NoSuchFieldException e) {
                     System.err.println("[Form] Champ non trouvé : " + fieldName);
+                } catch (IllegalArgumentException e) {
+                    System.err.println("[Form] Erreur de conversion pour le champ " + fieldName + " : " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
         }
@@ -208,18 +165,56 @@ public class Form<T> extends JPanel {
     }
 
     /**
-     * Vérifie si un field doit être ignoré
+     * Convertit une valeur String en type approprié
      */
+    private Object convertValue(Object value, Class<?> targetType) {
+        if (value == null) return null;
+        
+        // Si la valeur est déjà du bon type, la retourner telle quelle
+        if (targetType.isInstance(value)) {
+            return value;
+        }
+        
+        String stringValue = value.toString().trim();
+        if (stringValue.isEmpty()) return null;
+        
+        try {
+            // Types primitifs et leurs wrappers
+            if (targetType == int.class || targetType == Integer.class) {
+                return Integer.parseInt(stringValue);
+            } else if (targetType == long.class || targetType == Long.class) {
+                return Long.parseLong(stringValue);
+            } else if (targetType == double.class || targetType == Double.class) {
+                return Double.parseDouble(stringValue);
+            } else if (targetType == float.class || targetType == Float.class) {
+                return Float.parseFloat(stringValue);
+            } else if (targetType == boolean.class || targetType == Boolean.class) {
+                return Boolean.parseBoolean(stringValue);
+            } else if (targetType == short.class || targetType == Short.class) {
+                return Short.parseShort(stringValue);
+            } else if (targetType == byte.class || targetType == Byte.class) {
+                return Byte.parseByte(stringValue);
+            } else if (targetType == String.class) {
+                return stringValue;
+            } else if (targetType == java.sql.Timestamp.class) {
+                return java.sql.Timestamp.valueOf(stringValue);
+            } else if (targetType == java.util.Date.class) {
+                return java.sql.Date.valueOf(stringValue);
+            }
+        } catch (NumberFormatException e) {
+            System.err.println("[Form] Erreur de conversion de '" + stringValue + "' vers " + targetType.getSimpleName());
+        }
+        
+        // Pour les autres types, retourner la valeur telle quelle
+        return value;
+    }
+
     private boolean shouldIgnoreField(String fieldName) {
         return fieldName.equals("serialVersionUID") 
             || fieldName.equals("id") 
             || fieldName.equals("createdAt");
     }
 
-    /**
-     * Formate le nom d'un champ (camelCase → Label)
-     * Ex: "nameArticle" → "Name article"
-     */
     private String formatLabel(String fieldName) {
         StringBuilder result = new StringBuilder();
         for (int i = 0; i < fieldName.length(); i++) {
@@ -232,10 +227,6 @@ public class Form<T> extends JPanel {
         return result.toString();
     }
 
-    /**
-     * Permet de récupérer le composant associé à un champ par son nom.
-     * Utile pour forcer des valeurs ou ajouter des listeners spécifiques.
-     */
     public JPanel getFieldComponent(String fieldName) {
         return fields.get(fieldName);
     }

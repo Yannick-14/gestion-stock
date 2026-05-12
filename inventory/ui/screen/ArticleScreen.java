@@ -32,7 +32,7 @@ public class ArticleScreen extends AbstractFormScreen<Article> {
      * Enregistre l'article en base de données.
      */
     @Override
-    protected void saveArticle() {
+    protected void saveData() {
         try {
             // Créer une nouvelle instance et la remplir via le formulaire
             Article article = new Article();
