@@ -53,8 +53,8 @@ public class GenericMethodCRUD {
         List<T> resultats = new ArrayList<>();
 
         try (Connection conn = DbConnection.getInstance().getConnexion();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ResultSet rs = ps.executeQuery()) {
 
             Field[] champs = cls.getDeclaredFields();
             while (rs.next()) {
@@ -62,15 +62,93 @@ public class GenericMethodCRUD {
                 for (Field champ : champs) {
                     champ.setAccessible(true);
                     String col = toSnakeCase(champ.getName());
+                    
                     try {
-                        champ.set(instance, rs.getObject(col));
-                    } catch (Exception ignored) { /* colonne absente */ }
+                        // Vérifier si c'est une FK (colonne id_xxx)
+                        String fkCol = "id_" + col;
+                        Object fkValue = null;
+                        
+                        try {
+                            fkValue = rs.getObject(fkCol);
+                        } catch (Exception e) {
+                            // Pas de colonne FK correspondante
+                        }
+                        
+                        if (fkValue != null && !isPrimitiveOrWrapper(champ.getType()) 
+                            && !champ.getType().equals(String.class)
+                            && !java.util.Date.class.isAssignableFrom(champ.getType())
+                            && !java.sql.Timestamp.class.isAssignableFrom(champ.getType())) {
+                            // C'est un objet lié, charger la FK
+                            Object relatedObject = loadRelatedObject(champ.getType(), (Integer) fkValue, conn);
+                            champ.set(instance, relatedObject);
+                        } else {
+                            // Champ normal
+                            try {
+                                champ.set(instance, rs.getObject(col));
+                            } catch (Exception e) {
+                                // Essayer avec le nom exact de la colonne
+                                try {
+                                    champ.set(instance, rs.getObject(champ.getName()));
+                                } catch (Exception e2) {
+                                    // Ignorer si la colonne n'existe pas
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) { 
+                        // colonne absente ou type incompatible
+                    }
                 }
                 resultats.add(instance);
             }
         }
         System.out.println("[CRUD] findAllData → " + resultats.size() + " ligne(s) dans " + table);
         return resultats;
+    }
+
+    /**
+     * Charge un objet lié par sa clé étrangère
+     */
+    private Object loadRelatedObject(Class<?> relatedClass, int id, Connection conn) throws Exception {
+        String tableName = toSnakeCase(relatedClass.getSimpleName());
+        String sql = "SELECT * FROM " + tableName + " WHERE id = ?";
+        
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Object relatedInstance = relatedClass.getDeclaredConstructor().newInstance();
+                    Field[] fields = relatedClass.getDeclaredFields();
+                    
+                    for (Field field : fields) {
+                        field.setAccessible(true);
+                        String colName = toSnakeCase(field.getName());
+                        
+                        try {
+                            Object value = rs.getObject(colName);
+                            if (value != null) {
+                                field.set(relatedInstance, value);
+                            }
+                        } catch (Exception e) {
+                            // Essayer avec le nom exact du champ
+                            try {
+                                Object value = rs.getObject(field.getName());
+                                if (value != null) {
+                                    field.set(relatedInstance, value);
+                                }
+                            } catch (Exception e2) {
+                                // Ignorer les champs qui n'ont pas de colonne correspondante
+                            }
+                        }
+                    }
+                    
+                    System.out.println("[CRUD] FK chargée: " + relatedClass.getSimpleName() + "(id=" + id + ") -> " + relatedInstance);
+                    return relatedInstance;
+                }
+            }
+        }
+        
+        System.out.println("[CRUD] FK non trouvée: " + relatedClass.getSimpleName() + "(id=" + id + ")");
+        return null;
     }
 
     // ── read ──────────────────────────────────────────────────────────────────
