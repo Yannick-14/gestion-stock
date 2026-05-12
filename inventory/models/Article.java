@@ -1,6 +1,7 @@
 package inventory.models;
 
 import java.sql.Timestamp;
+import inventory.feature.annotation.FormIgnore;
 
 /**
  * Article (produit en stock).
@@ -9,17 +10,19 @@ import java.sql.Timestamp;
  */
 public class Article {
 
+    @FormIgnore
     private int id;
     private String nameArticle;
     private StockManagementMethod stockManagementMethod;
+    @FormIgnore
     private Timestamp createdAt;
 
     public Article() {}
 
     public Article(String nameArticle, StockManagementMethod stockManagementMethod) {
-        this.nameArticle           = nameArticle;
+        this.nameArticle = nameArticle;
         this.stockManagementMethod = stockManagementMethod;
-        this.createdAt             = new Timestamp(System.currentTimeMillis());
+        this.createdAt = new Timestamp(System.currentTimeMillis());
     }
 
     public int getId() { return id; }
@@ -38,8 +41,6 @@ public class Article {
 
     @Override
     public String toString() {
-        return "Article{id=" + id + ", nameArticle='" + nameArticle
-             + "', method=" + (stockManagementMethod != null ? stockManagementMethod.getNameMethod() : "null")
-             + ", createdAt=" + createdAt + "}";
+        return nameArticle;
     }
 }

@@ -4,8 +4,10 @@ import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.lang.reflect.Field;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Date;
 
 /**
  * Composant tableau générique.
@@ -17,30 +19,34 @@ import java.util.List;
  */
 public class PanelList<T> extends JPanel {
 
-    private final Class<T>      modelClass;
-    private final String[]      columnNames;
-    private final Field[]       fields;       // champs de la classe (hors id)
+    private final Class<T> modelClass;
+    private final String[] columnNames;
+    private final Field[] fields;
 
-    private DefaultTableModel   tableModel;
-    private JTable              table;
-    private List<T>             allData;
+    private DefaultTableModel tableModel;
+    private JTable table;
+    private List<T> allData;
+    private List<T> currentData; // Liste actuellement affichée (après filtrage)
 
-    // Composants filtre
-    private final List<TableFilter>   filters;
-    private final List<JComponent>    filterInputs = new ArrayList<>();
+    private final List<TableFilter> filters;
+    private final List<JComponent> filterInputs = new ArrayList<>();
+    private final List<CustomColumn<T>> customColumns;
+
+    private static final SimpleDateFormat DATETIME_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm");
 
     @SuppressWarnings("unchecked")
-    public PanelList(T prototype, List<T> data, List<TableFilter> filters) {
+    public PanelList(T prototype, List<T> data, List<TableFilter> filters, List<CustomColumn<T>> customColumns) {
         this.modelClass = (Class<T>) prototype.getClass();
-        this.allData    = new ArrayList<>(data);
-        this.filters    = filters != null ? filters : new ArrayList<>();
+        this.allData = new ArrayList<>(data);
+        this.filters = filters != null ? filters : new ArrayList<>();
+        this.customColumns = customColumns != null ? customColumns : new ArrayList<>();
 
-        // Extraire les champs (hors id)
+        // Champs existants (sans id)
         List<Field> visibleFields = new ArrayList<>();
         for (Field f : modelClass.getDeclaredFields()) {
             if (!f.getName().equals("id")) visibleFields.add(f);
         }
-        this.fields      = visibleFields.toArray(new Field[0]);
+        this.fields = visibleFields.toArray(new Field[0]);
         this.columnNames = buildColumnNames();
 
         setLayout(new BorderLayout(0, 8));
@@ -54,18 +60,28 @@ public class PanelList<T> extends JPanel {
     }
 
     /** Constructeur sans filtres */
+    public PanelList(T prototype, List<T> data, List<TableFilter> filters) {
+        this(prototype, data, filters, null);
+    }
+
     public PanelList(T prototype, List<T> data) {
-        this(prototype, data, null);
+        this(prototype, data, null, null);
     }
 
     // ── Construction des noms de colonnes ─────────────────────────────────────
-
     private String[] buildColumnNames() {
-        String[] names = new String[fields.length];
+        String[] baseNames = new String[fields.length];
         for (int i = 0; i < fields.length; i++) {
-            names[i] = splitCamelCase(fields[i].getName());
+            baseNames[i] = splitCamelCase(fields[i].getName());
         }
-        return names;
+
+        String[] allNames = new String[baseNames.length + customColumns.size()];
+        System.arraycopy(baseNames, 0, allNames, 0, baseNames.length);
+
+        for (int i = 0; i < customColumns.size(); i++) {
+            allNames[baseNames.length + i] = customColumns.get(i).getName();
+        }
+        return allNames;
     }
 
     // ── Panel filtres ─────────────────────────────────────────────────────────
@@ -109,7 +125,14 @@ public class PanelList<T> extends JPanel {
 
     private JScrollPane buildTablePanel() {
         tableModel = new DefaultTableModel(columnNames, 0) {
-            @Override public boolean isCellEditable(int row, int col) { return false; }
+            @Override public boolean isCellEditable(int row, int col) {
+                // Seules les colonnes boutons sont éditables (pour le clic)
+                int customColIndex = col - fields.length;
+                if (customColIndex >= 0 && customColIndex < customColumns.size()) {
+                    return customColumns.get(customColIndex).isButtonColumn();
+                }
+                return false;
+            }
         };
         table = new JTable(tableModel);
         styleTable();
@@ -118,7 +141,7 @@ public class PanelList<T> extends JPanel {
 
     private void styleTable() {
         table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        table.setRowHeight(28);
+        table.setRowHeight(35);
         table.setShowGrid(false);
         table.setIntercellSpacing(new Dimension(0, 0));
         table.setSelectionBackground(new Color(200, 215, 255));
@@ -126,9 +149,33 @@ public class PanelList<T> extends JPanel {
 
         JTableHeader header = table.getTableHeader();
         header.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        header.setBackground(new Color(52, 120, 246));
-        header.setForeground(Color.WHITE);
+        header.setBackground(Color.WHITE);
+        header.setForeground(Color.GRAY);
         header.setReorderingAllowed(false);
+
+        // Appliquer les renderers/editors pour les colonnes personnalisées
+        for (int i = 0; i < customColumns.size(); i++) {
+            CustomColumn<T> colDef = customColumns.get(i);
+            if (colDef.isButtonColumn()) {
+                int tableColIndex = fields.length + i;
+                TableColumn tableCol = table.getColumnModel().getColumn(tableColIndex);
+                
+                ButtonColumnRenderer renderer = new ButtonColumnRenderer();
+                renderer.setStyle(colDef.getButtonStyle());
+                tableCol.setCellRenderer(renderer);
+
+                // L'éditeur gère le clic réel
+                ButtonColumnEditor editor = new ButtonColumnEditor(obj -> {
+                    int row = table.getSelectedRow();
+                    T item = getItemAtRow(row);
+                    if (item != null) {
+                        colDef.onButtonClick(item);
+                    }
+                });
+                editor.setStyle(colDef.getButtonStyle());
+                tableCol.setCellEditor(editor);
+            }
+        }
     }
 
     // ── Données ───────────────────────────────────────────────────────────────
@@ -141,20 +188,44 @@ public class PanelList<T> extends JPanel {
 
     /** Rafraîchit le tableau avec une liste filtrée. */
     private void refreshTable(List<T> data) {
+        this.currentData = new ArrayList<>(data);
         tableModel.setRowCount(0);
         for (T item : data) {
-            Object[] row = new Object[fields.length];
+            Object[] row = new Object[fields.length + customColumns.size()];
+
+            // Colonnes de base (réflexion)
             for (int i = 0; i < fields.length; i++) {
                 fields[i].setAccessible(true);
                 try {
                     Object val = fields[i].get(item);
-                    row[i] = val != null ? val.toString() : "";
-                } catch (IllegalAccessException e) {
+                    row[i] = formatCellValue(val);
+                } catch (Exception e) {
                     row[i] = "";
                 }
             }
+
+            // Colonnes personnalisées
+            int base = fields.length;
+            for (int i = 0; i < customColumns.size(); i++) {
+                row[base + i] = customColumns.get(i).getValue(item);
+            }
+
             tableModel.addRow(row);
         }
+    }
+
+    // formater la valeur d'une cellule de table data
+    private String formatCellValue(Object value) {
+        if (value == null) {
+            return "";
+        }
+
+        // Formater les dates
+        if (value instanceof Date) {
+            return DATETIME_FORMAT.format((Date) value);
+        }
+        
+        return value.toString();
     }
 
     // ── Filtrage ──────────────────────────────────────────────────────────────
@@ -194,7 +265,10 @@ public class PanelList<T> extends JPanel {
             Field f = modelClass.getDeclaredField(fieldName);
             f.setAccessible(true);
             Object val = f.get(item);
-            return val != null ? val.toString() : "";
+            
+            if (val == null) return "";
+            
+            return formatCellValue(val);
         } catch (Exception e) {
             return "";
         }
@@ -214,4 +288,11 @@ public class PanelList<T> extends JPanel {
     }
 
     public JTable getTable() { return table; }
+
+    public T getItemAtRow(int row) {
+        if (row >= 0 && row < currentData.size()) {
+            return currentData.get(row);
+        }
+        return null;
+    }
 }

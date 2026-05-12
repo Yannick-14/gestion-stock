@@ -1,11 +1,14 @@
 package inventory.models;
 
+import inventory.feature.annotation.FormIgnore;
+
 /**
  * Méthode de gestion du stock (CUMP, LIFO, FIFO…).
  * Table SQL: stock_management_method
  */
 public class StockManagementMethod {
 
+    @FormIgnore
     private int id;
     private String nameMethod;
 
@@ -23,6 +26,6 @@ public class StockManagementMethod {
 
     @Override
     public String toString() {
-        return "StockManagementMethod{id=" + id + ", nameMethod='" + nameMethod + "'}";
+        return nameMethod;
     }
 }

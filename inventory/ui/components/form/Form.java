@@ -2,147 +2,260 @@ package inventory.ui.components.form;
 
 import inventory.ui.components.fields.FieldInput;
 import inventory.ui.components.fields.FieldSelect;
+import inventory.feature.repository.dao.GenericMethodCRUD;
 
 import javax.swing.*;
-import java.awt.*;
-import java.lang.reflect.Field;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.lang.reflect.Field;
+import java.util.*;
+import java.util.function.Consumer;
+import inventory.feature.annotation.FormIgnore;
 
 /**
- * Formulaire générique entièrement piloté par réflexion.
- *
- * Usage:
- *   Form<Article> form = new Form<>(Article.class, options);
- *   // options = Map<fieldName, List<?>> pour les champs objet (select)
- *
- * - Champs primitifs/String → FieldInput (texte)
- * - Champs d'un type métier ou avec une liste d'options → FieldSelect
- * - Champs id, createdAt → ignorés automatiquement
+ * Formulaire générique COMPLÈTEMENT DYNAMIQUE.
  */
 public class Form<T> extends JPanel {
+    private final Class<T> modelClass;
+    private final GenericMethodCRUD crud;
+    private T instance;
+    private final Map<String, JPanel> fields = new LinkedHashMap<>();
 
-    private final Class<T>                  modelClass;
-    private final Map<String, JComponent>   fieldComponents = new HashMap<>();
-
-    /**
-     * @param modelClass Classe du modèle
-     * @param options    Map fieldName → List d'items pour les selects (peut être null)
-     */
-    public Form(Class<T> modelClass, Map<String, List<?>> options) {
-        this.modelClass = modelClass;
+    public Form(T instance) {
+        this.modelClass = (Class<T>) instance.getClass();
+        this.crud = new GenericMethodCRUD();
+        
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setOpaque(false);
-        generateFields(options);
+        
+        buildForm();
     }
 
-    /** Constructeur sans options (uniquement des champs texte). */
+    @Deprecated
     public Form(Class<T> modelClass) {
-        this(modelClass, null);
+        this.modelClass = modelClass;
+        this.crud = new GenericMethodCRUD();
+        try {
+            this.instance = modelClass.getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            throw new RuntimeException("Impossible de créer une instance de " + modelClass.getName(), e);
+        }
+        
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        setOpaque(false);
+        
+        buildForm();
     }
 
-    // ── Génération automatique ────────────────────────────────────────────────
+    @Deprecated
+    public Form(Class<T> modelClass, Map<String, List<?>> options) {
+        this.modelClass = modelClass;
+        this.crud = new GenericMethodCRUD();
+        try {
+            this.instance = modelClass.getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            throw new RuntimeException("Impossible de créer une instance de " + modelClass.getName(), e);
+        }
+        
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        setOpaque(false);
+        
+        buildForm();
+    }
 
-    private void generateFields(Map<String, List<?>> options) {
-        for (Field field : modelClass.getDeclaredFields()) {
-            String name = field.getName();
-
-            // Champs systèmes ignorés
-            if (name.equals("id") || name.equals("createdAt")) continue;
-
-            String label = splitCamelCase(name);
-
-            if (options != null && options.containsKey(name)) {
-                // On a une liste d'options fournie → Select
-                addSelectInput(name, label, options.get(name));
-            } else if (isMetierType(field.getType())) {
-                // Type métier sans options → on affiche un warning (pas de champ)
-                System.out.println("[Form] Warning: aucune option pour le champ métier : " + name);
-            } else {
-                // Primitif ou String → Input texte
-                addTextInput(name, label);
+    private void buildForm() {
+        Field[] declaredFields = modelClass.getDeclaredFields();
+        
+        for (Field field : declaredFields) {
+            String fieldName = field.getName();
+            String fieldLabel = formatLabel(fieldName);
+            
+            if (shouldIgnoreField(field)) {
+                continue;
+            }
+            
+            JPanel fieldPanel = createField(field, fieldLabel);
+            if (fieldPanel != null) {
+                fields.put(fieldName, fieldPanel);
+                add(fieldPanel);
             }
         }
     }
 
-    // ── Ajout de champs ───────────────────────────────────────────────────────
-
-    public void addTextInput(String fieldName, String label) {
-        FieldInput input = new FieldInput(label);
-        input.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
-        input.setAlignmentX(Component.LEFT_ALIGNMENT);
-        fieldComponents.put(fieldName, input);
-        add(input);
-        add(Box.createVerticalStrut(4));
+    private JPanel createField(Field field, String label) {
+        Class<?> fieldType = field.getType();
+        
+        if (isCustomObject(fieldType)) {
+            List<?> items = loadDataForType(fieldType);
+            
+            if (!items.isEmpty()) {
+                return createSelectField(label, items);
+            }
+        }
+        
+        return createInputField(label);
     }
 
-    public <S> void addSelectInput(String fieldName, String label, List<S> items) {
-        FieldSelect<S> select = new FieldSelect<>(label, items);
-        select.setMaximumSize(new Dimension(Integer.MAX_VALUE, 65));
-        select.setAlignmentX(Component.LEFT_ALIGNMENT);
-        fieldComponents.put(fieldName, select);
-        add(select);
-        add(Box.createVerticalStrut(4));
+    private boolean isCustomObject(Class<?> clazz) {
+        return !clazz.isPrimitive()
+            && !clazz.equals(String.class)
+            && !clazz.equals(Integer.class)
+            && !clazz.equals(Long.class)
+            && !clazz.equals(Double.class)
+            && !clazz.equals(Float.class)
+            && !clazz.equals(Boolean.class)
+            && !clazz.equals(java.sql.Timestamp.class)
+            && !clazz.equals(java.util.Date.class);
     }
 
-    // ── Lecture des données ───────────────────────────────────────────────────
+    private List<?> loadDataForType(Class<?> typeClass) {
+        try {
+            Object tempInstance = typeClass.getDeclaredConstructor().newInstance();
+            return crud.findAllData(tempInstance);
+        } catch (Exception e) {
+            System.err.println("[Form] Erreur lors du chargement des données pour " + typeClass.getName() + " : " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    private JPanel createSelectField(String label, List<?> items) {
+        return new FieldSelect<>(label, items);
+    }
+
+    private JPanel createInputField(String label) {
+        return new FieldInput(label);
+    }
 
     /**
-     * Remplit une instance T avec les valeurs saisies dans le formulaire.
-     * @param instance Instance vide du modèle à peupler
+     * Remplit l'objet avec les données du formulaire
+     * AVEC CONVERSION DE TYPES
      */
-    public T getData(T instance) throws Exception {
-        for (Map.Entry<String, JComponent> entry : fieldComponents.entrySet()) {
-            Field field = modelClass.getDeclaredField(entry.getKey());
-            field.setAccessible(true);
-            JComponent comp = entry.getValue();
-            if (comp instanceof FieldInput) {
-                String val = ((FieldInput) comp).getText();
-                setFieldValue(field, instance, val);
-            } else if (comp instanceof FieldSelect) {
-                Object val = ((FieldSelect<?>) comp).getSelectedValue();
-                field.set(instance, val);
+    public T getData(T targetInstance) throws IllegalAccessException {
+        for (Map.Entry<String, JPanel> entry : fields.entrySet()) {
+            String fieldName = entry.getKey();
+            JPanel fieldPanel = entry.getValue();
+            Object value = null;
+
+            // Récupérer la valeur selon le type de champ
+            if (fieldPanel instanceof FieldInput) {
+                FieldInput fieldInput = (FieldInput) fieldPanel;
+                value = fieldInput.getText();
+            } else if (fieldPanel instanceof FieldSelect) {
+                FieldSelect<?> fieldSelect = (FieldSelect<?>) fieldPanel;
+                value = fieldSelect.getSelectedValue();
+            }
+
+            // Utiliser la réflexion pour setter le champ avec conversion de type
+            if (value != null && !value.toString().isEmpty()) {
+                try {
+                    Field field = modelClass.getDeclaredField(fieldName);
+                    field.setAccessible(true);
+                    
+                    // Convertir la valeur selon le type du champ
+                    Object convertedValue = convertValue(value, field.getType());
+                    field.set(targetInstance, convertedValue);
+                    
+                } catch (NoSuchFieldException e) {
+                    System.err.println("[Form] Champ non trouvé : " + fieldName);
+                } catch (IllegalArgumentException e) {
+                    System.err.println("[Form] Erreur de conversion pour le champ " + fieldName + " : " + e.getMessage());
+                    e.printStackTrace();
+                }
             }
         }
-        return instance;
+        
+        return targetInstance;
     }
 
-    // ── Utilitaires internes ──────────────────────────────────────────────────
+    /**
+     * Convertit une valeur String en type approprié
+     */
+    private Object convertValue(Object value, Class<?> targetType) {
+        if (value == null) return null;
+        
+        // Si la valeur est déjà du bon type, la retourner telle quelle
+        if (targetType.isInstance(value)) {
+            return value;
+        }
+        
+        String stringValue = value.toString().trim();
+        if (stringValue.isEmpty()) return null;
+        
+        try {
+            // Types primitifs et leurs wrappers
+            if (targetType == int.class || targetType == Integer.class) {
+                return Integer.parseInt(stringValue);
+            } else if (targetType == long.class || targetType == Long.class) {
+                return Long.parseLong(stringValue);
+            } else if (targetType == double.class || targetType == Double.class) {
+                return Double.parseDouble(stringValue);
+            } else if (targetType == float.class || targetType == Float.class) {
+                return Float.parseFloat(stringValue);
+            } else if (targetType == boolean.class || targetType == Boolean.class) {
+                return Boolean.parseBoolean(stringValue);
+            } else if (targetType == short.class || targetType == Short.class) {
+                return Short.parseShort(stringValue);
+            } else if (targetType == byte.class || targetType == Byte.class) {
+                return Byte.parseByte(stringValue);
+            } else if (targetType == String.class) {
+                return stringValue;
+            } else if (targetType == java.sql.Timestamp.class) {
+                return java.sql.Timestamp.valueOf(stringValue);
+            } else if (targetType == java.util.Date.class) {
+                return java.sql.Date.valueOf(stringValue);
+            }
+        } catch (NumberFormatException e) {
+            System.err.println("[Form] Erreur de conversion de '" + stringValue + "' vers " + targetType.getSimpleName());
+        }
+        
+        // Pour les autres types, retourner la valeur telle quelle
+        return value;
+    }
 
-    private void setFieldValue(Field field, Object instance, String value) throws Exception {
-        Class<?> type = field.getType();
-        if (type == String.class) {
-            field.set(instance, value);
-        } else if (type == int.class || type == Integer.class) {
-            field.set(instance, value.isEmpty() ? 0 : Integer.parseInt(value));
-        } else if (type == double.class || type == Double.class) {
-            field.set(instance, value.isEmpty() ? 0.0 : Double.parseDouble(value));
-        } else if (type == long.class || type == Long.class) {
-            field.set(instance, value.isEmpty() ? 0L : Long.parseLong(value));
+    private boolean shouldIgnoreField(Field field) {
+        return field.getName().equals("serialVersionUID") 
+            || field.isAnnotationPresent(FormIgnore.class);
+    }
+
+    private String formatLabel(String fieldName) {
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < fieldName.length(); i++) {
+            char c = fieldName.charAt(i);
+            if (Character.isUpperCase(c) && i > 0) {
+                result.append(" ");
+            }
+            result.append(i == 0 ? Character.toUpperCase(c) : c);
+        }
+        return result.toString();
+    }
+
+    public void setFieldVisible(String fieldName, boolean visible) {
+        JPanel panel = fields.get(fieldName);
+        if (panel != null) {
+            panel.setVisible(visible);
+            revalidate();
+            repaint();
         }
     }
 
-    /** Retourne true si le type est un type métier (classe de notre domaine). */
-    private boolean isMetierType(Class<?> type) {
-        return !type.isPrimitive()
-            && !type.getName().startsWith("java.lang")
-            && !type.getName().startsWith("java.sql")
-            && !type.getName().startsWith("java.util");
+    public void addFieldListener(String fieldName, Consumer<Object> listener) {
+        JPanel panel = fields.get(fieldName);
+        if (panel == null) return;
+
+        if (panel instanceof FieldSelect) {
+            FieldSelect<?> select = (FieldSelect<?>) panel;
+            select.getComboBox().addActionListener(e -> listener.accept(select.getSelectedValue()));
+        } else if (panel instanceof FieldInput) {
+            FieldInput input = (FieldInput) panel;
+            input.getTextField().getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                private void update() { listener.accept(input.getText()); }
+                public void insertUpdate(javax.swing.event.DocumentEvent e) { update(); }
+                public void removeUpdate(javax.swing.event.DocumentEvent e) { update(); }
+                public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }
+            });
+        }
     }
 
-    private String splitCamelCase(String s) {
-        String result = s.replaceAll(
-            String.format("%s|%s|%s",
-                "(?<=[A-Z])(?=[A-Z][a-z])",
-                "(?<=[^A-Z])(?=[A-Z])",
-                "(?<=[A-Za-z])(?=[^A-Za-z])"),
-            " "
-        );
-        return result.substring(0, 1).toUpperCase() + result.substring(1).toLowerCase();
-    }
-
-    public Map<String, JComponent> getFieldComponents() {
-        return fieldComponents;
+    public JPanel getFieldComponent(String fieldName) {
+        return fields.get(fieldName);
     }
 }

@@ -1,11 +1,14 @@
 package inventory.models;
 
+import inventory.feature.annotation.FormIgnore;
+
 /**
  * Type de mouvement de stock (Entrée, Sortie).
  * Table SQL: type_stock_movement
  */
 public class TypeStockMovement {
 
+    @FormIgnore
     private int id;
     private String nameType;
 
@@ -23,6 +26,6 @@ public class TypeStockMovement {
 
     @Override
     public String toString() {
-        return "TypeStockMovement{id=" + id + ", nameType='" + nameType + "'}";
+        return nameType;
     }
 }
