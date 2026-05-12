@@ -28,30 +28,30 @@ public class Main {
             migration.migrate();
 
             // 2. Migration de données (insertions initiales)
-            GenericMethodCRUD crud = new GenericMethodCRUD();
+            // GenericMethodCRUD crud = new GenericMethodCRUD();
 
-            System.out.println("\n[Main] Vérification et insertion des données initiales...");
+            // System.out.println("\n[Main] Vérification et insertion des données initiales...");
 
-            // Méthodes de gestion de stock
-            if (crud.findAllData(new StockManagementMethod()).isEmpty()) {
-                System.out.println("  → Insertion des méthodes de gestion de stock...");
-                crud.insertData(new StockManagementMethod("CUMP"));
-                crud.insertData(new StockManagementMethod("FIFO"));
-                crud.insertData(new StockManagementMethod("LIFO"));
-            } else {
-                System.out.println("  → Méthodes de gestion de stock déjà présentes.");
-            }
+            // // Méthodes de gestion de stock
+            // if (crud.findAllData(new StockManagementMethod()).isEmpty()) {
+            //     System.out.println("  → Insertion des méthodes de gestion de stock...");
+            //     crud.insertData(new StockManagementMethod("CUMP"));
+            //     crud.insertData(new StockManagementMethod("FIFO"));
+            //     crud.insertData(new StockManagementMethod("LIFO"));
+            // } else {
+            //     System.out.println("  → Méthodes de gestion de stock déjà présentes.");
+            // }
 
-            // Types de mouvement
-            if (crud.findAllData(new TypeStockMovement()).isEmpty()) {
-                System.out.println("  → Insertion des types de mouvement...");
-                crud.insertData(new TypeStockMovement("Entrée"));
-                crud.insertData(new TypeStockMovement("Sortie"));
-            } else {
-                System.out.println("  → Types de mouvement déjà présents.");
-            }
+            // // Types de mouvement
+            // if (crud.findAllData(new TypeStockMovement()).isEmpty()) {
+            //     System.out.println("  → Insertion des types de mouvement...");
+            //     crud.insertData(new TypeStockMovement("Entrée"));
+            //     crud.insertData(new TypeStockMovement("Sortie"));
+            // } else {
+            //     System.out.println("  → Types de mouvement déjà présents.");
+            // }
 
-            System.out.println("\n[Main] Migration d'insertion terminée.");
+            // System.out.println("\n[Main] Migration d'insertion terminée.");
 
         } catch (Exception e) {
             System.err.println("[Main] Erreur lors de la migration: " + e.getMessage());

@@ -8,6 +8,8 @@ import javax.swing.*;
 import java.util.List;
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.function.Consumer;
+import inventory.feature.annotation.FormIgnore;
 
 /**
  * Formulaire générique COMPLÈTEMENT DYNAMIQUE.
@@ -67,7 +69,7 @@ public class Form<T> extends JPanel {
             String fieldName = field.getName();
             String fieldLabel = formatLabel(fieldName);
             
-            if (shouldIgnoreField(fieldName)) {
+            if (shouldIgnoreField(field)) {
                 continue;
             }
             
@@ -209,10 +211,9 @@ public class Form<T> extends JPanel {
         return value;
     }
 
-    private boolean shouldIgnoreField(String fieldName) {
-        return fieldName.equals("serialVersionUID") 
-            || fieldName.equals("id") 
-            || fieldName.equals("createdAt");
+    private boolean shouldIgnoreField(Field field) {
+        return field.getName().equals("serialVersionUID") 
+            || field.isAnnotationPresent(FormIgnore.class);
     }
 
     private String formatLabel(String fieldName) {
@@ -225,6 +226,33 @@ public class Form<T> extends JPanel {
             result.append(i == 0 ? Character.toUpperCase(c) : c);
         }
         return result.toString();
+    }
+
+    public void setFieldVisible(String fieldName, boolean visible) {
+        JPanel panel = fields.get(fieldName);
+        if (panel != null) {
+            panel.setVisible(visible);
+            revalidate();
+            repaint();
+        }
+    }
+
+    public void addFieldListener(String fieldName, Consumer<Object> listener) {
+        JPanel panel = fields.get(fieldName);
+        if (panel == null) return;
+
+        if (panel instanceof FieldSelect) {
+            FieldSelect<?> select = (FieldSelect<?>) panel;
+            select.getComboBox().addActionListener(e -> listener.accept(select.getSelectedValue()));
+        } else if (panel instanceof FieldInput) {
+            FieldInput input = (FieldInput) panel;
+            input.getTextField().getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                private void update() { listener.accept(input.getText()); }
+                public void insertUpdate(javax.swing.event.DocumentEvent e) { update(); }
+                public void removeUpdate(javax.swing.event.DocumentEvent e) { update(); }
+                public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }
+            });
+        }
     }
 
     public JPanel getFieldComponent(String fieldName) {

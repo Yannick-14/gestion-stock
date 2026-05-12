@@ -1,6 +1,7 @@
 package inventory.models;
 
 import java.sql.Timestamp;
+import inventory.feature.annotation.FormIgnore;
 
 /**
  * Article (produit en stock).
@@ -9,9 +10,11 @@ import java.sql.Timestamp;
  */
 public class Article {
 
+    @FormIgnore
     private int id;
     private String nameArticle;
     private StockManagementMethod stockManagementMethod;
+    @FormIgnore
     private Timestamp createdAt;
 
     public Article() {}

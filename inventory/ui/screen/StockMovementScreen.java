@@ -1,51 +1,80 @@
 package inventory.ui.screen;
 
 import inventory.feature.repository.dao.GenericMethodCRUD;
+import inventory.feature.stock.StockManager;
 import inventory.models.StockMovement;
+import inventory.models.TypeStockMovement;
 
 import javax.swing.*;
+import java.util.List;
 
 /**
- * Écran d'entrée en stock.
- * 
- * Hérite de AbstractFormScreen.
- * Force le type de mouvement à "Entrée".
+ * Écran de mouvement de stock (Entrée/Sortie).
  */
 public class StockMovementScreen extends AbstractFormScreen<StockMovement> {
 
     private final GenericMethodCRUD crud = new GenericMethodCRUD();
+    private final StockManager stockManager = new StockManager();
 
     public StockMovementScreen() {
-        super("Entrée en stock", new StockMovement());
+        super("Mouvement de stock", new StockMovement());
+        setupFormListeners();
     }
-    /**
-     * Implémentation de la méthode abstraite saveArticle.
-     * Enregistre l'article en base de données.
-     */
+
+    private void setupFormListeners() {
+        // Écouter les changements de type de mouvement
+        form.addFieldListener("typeStockMovement", value -> {
+            if (value instanceof TypeStockMovement) {
+                String typeName = ((TypeStockMovement) value).getNameType().toLowerCase();
+                boolean isExit = typeName.contains("sort");
+                
+                // Masquer le prix unitaire si c'est une sortie
+                form.setFieldVisible("unitPrice", !isExit);
+            }
+        });
+    }
+
     @Override
     protected void saveData() {
         try {
-            // Créer une nouvelle instance et la remplir via le formulaire
-            StockMovement movement = new StockMovement();
-            movement = form.getData(movement);
+            // Récupérer les données de base du formulaire
+            StockMovement request = new StockMovement();
+            request = form.getData(request);
+            request.setCreatedAt(new java.sql.Timestamp(System.currentTimeMillis()));
 
-            // Date de création automatique
-            movement.setCreatedAt(new java.sql.Timestamp(System.currentTimeMillis()));
-            
-            // Insertion via CRUD
-            int id = crud.insertData(movement);
-            
-            JOptionPane.showMessageDialog(this,
-                "Mouvement de stock enregistré avec succès ! (id=" + id + ")",
-                "Succès", JOptionPane.INFORMATION_MESSAGE);
+            // Générer la référence de transaction UNIQUE pour cette opération
+            String ref = "REF-" + System.currentTimeMillis();
+            request.setTransactionRef(ref);
+
+            String typeName = request.getTypeStockMovement() != null ? 
+                              request.getTypeStockMovement().getNameType().toLowerCase() : "";
+
+            if (typeName.contains("sort")) {
+                // LOGIQUE DE SORTIE : Utilisation du StockManager pour le découpage FIFO/LIFO/CUMP
+                List<StockMovement> toInsert = stockManager.prepareExit(request);
                 
-            // Réinitialiser le formulaire après l'enregistrement réussi
+                for (StockMovement m : toInsert) {
+                    crud.insertData(m);
+                }
+                
+                JOptionPane.showMessageDialog(this,
+                    "Sortie enregistrée avec succès en " + toInsert.size() + " ligne(s) de mouvement.",
+                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                // LOGIQUE D'ENTRÉE : Insertion simple
+                int id = crud.insertData(request);
+                JOptionPane.showMessageDialog(this, 
+                    "Entrée enregistrée avec succès ! (id=" + id + ")", 
+                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            }
+
+            // Réinitialiser le formulaire
             resetForm();
 
         } catch (Exception ex) {
-            System.err.println("Erreur lors de l'enregistrement mouvement: " + ex);
-            JOptionPane.showMessageDialog(this,
-                "Erreur lors de l'enregistrement : " + ex.getMessage(),
+            System.err.println("Erreur lors de l'enregistrement : " + ex.getMessage());
+            JOptionPane.showMessageDialog(this, 
+                "Erreur : " + ex.getMessage(), 
                 "Erreur", JOptionPane.ERROR_MESSAGE);
             ex.printStackTrace();
         }

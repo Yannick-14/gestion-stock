@@ -1,6 +1,7 @@
 package inventory.models;
 
 import java.sql.Timestamp;
+import inventory.feature.annotation.FormIgnore;
 
 /**
  * Mouvement de stock (entrée/sortie d'un article).
@@ -10,12 +11,16 @@ import java.sql.Timestamp;
  */
 public class StockMovement {
 
+    @FormIgnore
     private int id;
     private Article article;
     private TypeStockMovement typeStockMovement;
+    @FormIgnore
     private Timestamp createdAt;
     private int quantity;
     private double unitPrice;
+    @FormIgnore
+    private String transactionRef;
 
     public StockMovement() {}
 
@@ -47,6 +52,9 @@ public class StockMovement {
 
     public double getUnitPrice() { return unitPrice; }
     public void setUnitPrice(double unitPrice) { this.unitPrice = unitPrice; }
+
+    public String getTransactionRef() { return transactionRef; }
+    public void setTransactionRef(String transactionRef) { this.transactionRef = transactionRef; }
 
     @Override
     public String toString() {
