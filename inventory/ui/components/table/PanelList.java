@@ -322,7 +322,7 @@ public class PanelList<T> extends JPanel {
                 ((JComboBox<?>) comp).setSelectedIndex(0);
             }
         }
-        
+
         // Afficher toutes les données
         refreshTable(allData);
     }

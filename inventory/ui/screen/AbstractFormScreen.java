@@ -84,14 +84,10 @@ public abstract class AbstractFormScreen<T> extends JPanel {
                 }
             }
             
-            JOptionPane.showMessageDialog(this,
-                "Formulaire réinitialisé avec succès.",
-                "Réinitialisation", JOptionPane.INFORMATION_MESSAGE);
+            // JOptionPane.showMessageDialog(this, "Formulaire réinitialisé avec succès.", "Réinitialisation", JOptionPane.INFORMATION_MESSAGE);
                 
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this,
-                "Erreur lors de la réinitialisation : " + e.getMessage(),
-                "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Erreur lors de la réinitialisation : " + e.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
             e.printStackTrace();
         }
     }
@@ -111,10 +107,10 @@ public abstract class AbstractFormScreen<T> extends JPanel {
     private void addDefaultActions() {
         // Bouton Réinitialiser (style SECONDARY)
         addAction("Réinitialiser", Button.Style.SECONDARY, e -> resetForm());
-        
+
         // Espacement entre les boutons
         actionPanel.add(Box.createHorizontalStrut(8));
-        
+
         // Bouton Enregistrer (style PRIMARY)
         addAction("Enregistrer", Button.Style.PRIMARY, e -> saveData());
     }
@@ -126,7 +122,7 @@ public abstract class AbstractFormScreen<T> extends JPanel {
     protected void setActions(List<FormAction> actionList) {
         // Sauvegarder les actions supplémentaires
         this.additionalActions = new ArrayList<>(actionList);
-        
+
         // Reconstruire le panel d'actions
         rebuildActionPanel();
     }
@@ -136,7 +132,7 @@ public abstract class AbstractFormScreen<T> extends JPanel {
      */
     private void rebuildActionPanel() {
         actionPanel.removeAll();
-        
+
         // Ajouter les actions supplémentaires (si elles existent)
         if (!additionalActions.isEmpty()) {
             for (FormAction action : additionalActions) {
@@ -147,7 +143,7 @@ public abstract class AbstractFormScreen<T> extends JPanel {
         
         // Réinitialiser les boutons par défaut
         addDefaultActions();
-        
+
         actionPanel.revalidate();
         actionPanel.repaint();
     }

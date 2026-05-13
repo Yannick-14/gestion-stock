@@ -4,8 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 
 public class Window {
-    
-    // Configuration par défaut
+
     private static final String DEFAULT_TITLE = "Inventory Management System";
     private static final int DEFAULT_WIDTH = 1200;
     private static final int DEFAULT_HEIGHT = 800;
@@ -26,7 +25,7 @@ public class Window {
         frame = new JFrame(title);
         configureWindow(width, height);
     }
-    
+
     private void configureWindow(int width, int height) {
         // Configuration de base
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
