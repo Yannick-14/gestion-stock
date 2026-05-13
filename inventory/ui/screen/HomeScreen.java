@@ -4,6 +4,7 @@ import inventory.feature.repository.dao.GenericMethodCRUD;
 import inventory.feature.stock.StockManager;
 import inventory.models.Article;
 import inventory.models.StockMovement;
+import inventory.models.StockState;
 import inventory.ui.components.button.Button;
 import inventory.ui.components.fields.FieldDate;
 import inventory.ui.components.table.CustomColumn;
@@ -194,7 +195,7 @@ public class HomeScreen extends JPanel {
             @Override public String getName() { return "Qte Stock"; }
             @Override public Object getValue(Article article) {
                 if (article.getId() == 0) return 0;
-                StockManager.StockState state = stockManager.calculateStockState(article, allMovements);
+                StockState state = stockManager.calculateStockState(article, allMovements);
                 return state.quantity;
             }
         };
@@ -205,7 +206,7 @@ public class HomeScreen extends JPanel {
             @Override public String getName() { return "Valeur Totale"; }
             @Override public Object getValue(Article article) {
                 if (article.getId() == 0) return "0.00 Ar";
-                StockManager.StockState state = stockManager.calculateStockState(article, allMovements);
+                StockState state = stockManager.calculateStockState(article, allMovements);
                 return String.format("%.2f Ar", state.totalValue);
             }
         };

@@ -225,7 +225,6 @@ public class GenericMethodCRUD {
      * Ignore le premier champ (id auto-généré).
      * @return l'objet inséré avec son ID mis à jour
      */
-    @SuppressWarnings("unchecked")
     public <T> T insertData(T obj) throws Exception {
         String table = tableNomDepuisClasse(obj);
         Field[] champs = obj.getClass().getDeclaredFields();

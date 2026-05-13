@@ -1,120 +1,154 @@
 package inventory.feature.stock;
 
 import inventory.feature.repository.dao.GenericMethodCRUD;
-import inventory.models.Article;
-import inventory.models.StockMovement;
-import java.util.*;
 
-/**
- * Service pour la gestion des stocks (FIFO, LIFO, CUMP).
- */
+import java.util.*;
+import inventory.models.*;
+// import java.util.stream.Collectors;
+
 public class StockManager {
     private final GenericMethodCRUD crud = new GenericMethodCRUD();
 
     /**
-     * Traite une sortie de stock en la découpant si nécessaire (FIFO/LIFO)
-     * @return Liste des mouvements à insérer
+     * Traite une demande de sortie de stock selon la méthode de gestion (FIFO, LIFO, CUMP).
      */
-    public List<StockMovement> prepareExit(StockMovement exitRequest) throws Exception {
+    public List<StockMovement> processExitRequest(StockMovement exitRequest) throws Exception {
+        if (exitRequest.getArticle() == null) {
+            throw new Exception("Article non spécifié");
+        }
+
         Article article = exitRequest.getArticle();
-        if (article == null) throw new Exception("Article non spécifié");
-
-        String method = article.getStockManagementMethod() != null ? 
-                        article.getStockManagementMethod().getNameMethod().toLowerCase() : "cump";
-
         List<StockMovement> allMovements = crud.findAllData(new StockMovement());
         List<Batch> batches = resolveBatches(article, allMovements);
 
-        int totalAvailable = batches.stream().mapToInt(b -> b.quantity).sum();
+        // Vérifier la disponibilité
+        int totalAvailable = batches.stream().mapToInt(b -> b.getQuantity()).sum();
         if (totalAvailable < exitRequest.getQuantity()) {
-            throw new Exception("Stock insuffisant (disponible: " + totalAvailable + ")");
+            throw new Exception("Stock insuffisant. Disponible: " + totalAvailable + ", Demandé: " + exitRequest.getQuantity());
         }
+
+        // Déterminer la méthode de gestion
+        String method = getStockMethod(article).toLowerCase();
+        String transactionRef = exitRequest.getTransactionRef() != null ? 
+                               exitRequest.getTransactionRef() : generateRef();
+
+        return method.contains("cump") ? 
+               processCUMP(batches, article, exitRequest, transactionRef) :
+               processFIFOorLIFO(batches, article, exitRequest, transactionRef, method.contains("lifo"));
+    }
+
+    /**
+     * Traitement CUMP : une seule ligne de sortie avec prix moyen.
+     */
+    private List<StockMovement> processCUMP(List<Batch> batches, Article article, 
+                                            StockMovement exitRequest, String transactionRef) {
+        double cump = calculateTotalValue(batches) / (double) batches.stream().mapToInt(b -> b.getQuantity()).sum();
+        StockMovement movement = new StockMovement(article, exitRequest.getTypeStockMovement(), 
+                                                   exitRequest.getQuantity(), cump);
+        movement.setTransactionRef(transactionRef);
+        return List.of(movement);
+    }
+
+    /**
+     * Traitement FIFO/LIFO : plusieurs lignes de sortie selon les lots.
+     */
+    private List<StockMovement> processFIFOorLIFO(List<Batch> batches, Article article,
+                                                   StockMovement exitRequest, String transactionRef, 
+                                                   boolean isLIFO) {
+        if (isLIFO) Collections.reverse(batches);
 
         List<StockMovement> results = new ArrayList<>();
         int remaining = exitRequest.getQuantity();
-        String ref = exitRequest.getTransactionRef();
-        if (ref == null) ref = "REF-" + System.currentTimeMillis();
 
-        if (method.contains("cump")) {
-            double totalValue = batches.stream().mapToDouble(b -> b.quantity * b.price).sum();
-            double cump = totalQtyToValue(batches) / (double) totalAvailable;
-            
-            StockMovement m = new StockMovement(article, exitRequest.getTypeStockMovement(), exitRequest.getQuantity(), cump);
-            m.setTransactionRef(ref);
-            results.add(m);
-        } else {
-            if (method.contains("lifo")) {
-                Collections.reverse(batches);
-            }
+        for (Batch batch : batches) {
+            if (remaining <= 0) break;
 
-            for (Batch batch : batches) {
-                if (remaining <= 0) break;
-                
-                int taken = Math.min(batch.quantity, remaining);
-                StockMovement m = new StockMovement(article, exitRequest.getTypeStockMovement(), taken, batch.price);
-                m.setTransactionRef(ref);
-                results.add(m);
-                
-                remaining -= taken;
-            }
+            int taken = Math.min(batch.getQuantity(), remaining);
+            StockMovement movement = new StockMovement(article, exitRequest.getTypeStockMovement(), 
+                                                       taken, batch.getPrice());
+            movement.setTransactionRef(transactionRef);
+            results.add(movement);
+            remaining -= taken;
         }
 
         return results;
     }
 
-    private double totalQtyToValue(List<Batch> batches) {
-        return batches.stream().mapToDouble(b -> b.quantity * b.price).sum();
-    }
-
     /**
-     * Calcule l'état actuel du stock (Qté et Valeur) pour un article.
+     * Calcule l'état du stock (quantité et valeur totale).
      */
-    public StockState calculateStockState(Article article, List<StockMovement> allMvmts) {
-        List<Batch> batches = resolveBatches(article, allMvmts);
-        int totalQty = batches.stream().mapToInt(b -> b.quantity).sum();
-        double totalValue = totalQtyToValue(batches);
-        
+    public StockState calculateStockState(Article article, List<StockMovement> movements) {
+        List<Batch> batches = resolveBatches(article, movements);
+        int totalQty = batches.stream().mapToInt(b -> b.getQuantity()).sum();
+        double totalValue = calculateTotalValue(batches);
         return new StockState(totalQty, totalValue);
     }
 
-    public static class StockState {
-        public final int quantity;
-        public final double totalValue;
-        public StockState(int q, double v) { this.quantity = q; this.totalValue = v; }
-    }
-
-    private List<Batch> resolveBatches(Article article, List<StockMovement> allMvmts) {
+    /**
+     * Reconstitue les lots disponibles en parcourant l'historique des mouvements.
+     */
+    private List<Batch> resolveBatches(Article article, List<StockMovement> allMovements) {
         List<Batch> batches = new ArrayList<>();
 
-        List<StockMovement> articleMvmts = allMvmts.stream()
+        allMovements.stream()
             .filter(m -> m.getArticle() != null && m.getArticle().getId() == article.getId())
             .sorted(Comparator.comparing(StockMovement::getCreatedAt))
-            .toList();
-
-        for (StockMovement m : articleMvmts) {
-            String type = m.getTypeStockMovement() != null ? 
-                          m.getTypeStockMovement().getNameType().toLowerCase() : "";
-            
-            if (type.contains("entr")) {
-                batches.add(new Batch(m.getQuantity(), m.getUnitPrice()));
-            } else {
-                int toReduce = m.getQuantity();
-                Iterator<Batch> it = batches.iterator();
-                while (it.hasNext() && toReduce > 0) {
-                    Batch b = it.next();
-                    int reduce = Math.min(b.quantity, toReduce);
-                    b.quantity -= reduce;
-                    toReduce -= reduce;
-                    if (b.quantity == 0) it.remove();
+            .forEach(movement -> {
+                String type = getMovementType(movement).toLowerCase();
+                
+                if (type.contains("entr")) {
+                    // Entrée : ajouter un nouveau lot
+                    batches.add(new Batch(movement.getQuantity(), movement.getUnitPrice()));
+                } else {
+                    // Sortie : réduire les lots existants
+                    reduceFromBatches(batches, movement.getQuantity());
                 }
-            }
-        }
+            });
+
         return batches;
     }
 
-    private static class Batch {
-        int quantity;
-        double price;
-        Batch(int q, double p) { this.quantity = q; this.price = p; }
+    /**
+     * Réduit les quantités des lots lors d'une sortie.
+     */
+    private void reduceFromBatches(List<Batch> batches, int quantityToReduce) {
+        Iterator<Batch> it = batches.iterator();
+        while (it.hasNext() && quantityToReduce > 0) {
+            Batch batch = it.next();
+            int reduction = Math.min(batch.getQuantity(), quantityToReduce);
+            batch.setQuantity(batch.getQuantity() - reduction);
+            quantityToReduce -= reduction;
+            if (batch.getQuantity() == 0) it.remove();
+        }
+    }
+
+    /**
+     * Calcule la valeur totale des lots.
+     */
+    private double calculateTotalValue(List<Batch> batches) {
+        return batches.stream().mapToDouble(b -> b.getQuantity() * b.getPrice()).sum();
+    }
+
+    /**
+     * Récupère la méthode de gestion du stock de l'article.
+     */
+    private String getStockMethod(Article article) {
+        return article.getStockManagementMethod() != null ? 
+               article.getStockManagementMethod().getNameMethod() : "CUMP";
+    }
+
+    /**
+     * Récupère le type de mouvement.
+     */
+    private String getMovementType(StockMovement movement) {
+        return movement.getTypeStockMovement() != null ? 
+               movement.getTypeStockMovement().getNameType() : "";
+    }
+
+    /**
+     * Génère une référence de transaction unique.
+     */
+    private String generateRef() {
+        return "REF-" + System.currentTimeMillis();
     }
 }

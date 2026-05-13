@@ -51,7 +51,7 @@ public class StockMovementScreen extends AbstractFormScreen<StockMovement> {
 
             if (typeName.contains("sort")) {
                 // LOGIQUE DE SORTIE : Utilisation du StockManager pour le découpage FIFO/LIFO/CUMP
-                List<StockMovement> toInsert = stockManager.prepareExit(request);
+                List<StockMovement> toInsert = stockManager.processExitRequest(request);
                 
                 for (StockMovement m : toInsert) {
                     crud.insertData(m);
