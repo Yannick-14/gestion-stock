@@ -1,0 +1,2 @@
+Main-Class: inventory.Application
+Class-Path: inventory/lib/postgresql-42.3.7.jar
