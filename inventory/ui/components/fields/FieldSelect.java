@@ -14,7 +14,7 @@ public class FieldSelect<T> extends JPanel {
 
     private final JLabel label;
     private final JComboBox<T> comboBox;
-    private List<T> items;
+    List<T> items;
 
     public FieldSelect(String labelText, List<T> items) {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));

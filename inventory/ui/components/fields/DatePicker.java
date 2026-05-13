@@ -3,8 +3,8 @@ package inventory.ui.components.fields;
 import javax.swing.*;
 import javax.swing.border.CompoundBorder;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+// import java.awt.event.ActionEvent;
+// import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.time.LocalDate;
@@ -141,7 +141,7 @@ public class DatePicker extends JPanel {
 
             int daysInMonth = currentView.lengthOfMonth();
             for (int day = 1; day <= daysInMonth; day++) {
-                final int d = day;
+                // final int d = day;
                 JButton btn = new JButton(String.valueOf(day));
                 btn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
                 btn.setFocusPainted(false);

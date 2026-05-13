@@ -2,7 +2,7 @@ package inventory.ui.components.table;
 
 import inventory.ui.components.button.Button;
 import javax.swing.*;
-import javax.swing.table.*;
+// import javax.swing.table.*;
 import java.awt.*;
 import java.util.function.Consumer;
 
@@ -23,7 +23,7 @@ public class ButtonColumnEditor extends DefaultCellEditor {
         
         panel = new JPanel(new GridBagLayout());
         panel.setOpaque(true);
-        
+
         button = new JButton();
         button.setOpaque(true);
         button.setBorderPainted(false);
@@ -39,10 +39,10 @@ public class ButtonColumnEditor extends DefaultCellEditor {
             boolean isSelected, int row, int column) {
         label = (value == null) ? "Voir" : value.toString();
         button.setText(label);
-        
+
         // Match selection colors
         panel.setBackground(table.getSelectionBackground());
-        
+
         isPushed = true;
         return panel;
     }
