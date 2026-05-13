@@ -4,7 +4,6 @@ import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-// import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,7 +63,7 @@ public class GenericMethodCRUD {
                     String col = toSnakeCase(champ.getName());
                     
                     try {
-                        // Vérifier si c'est une FK (colonne id_xxx)
+                        // verified foreign key
                         String fkCol = "id_" + col;
                         Object fkValue = null;
                         
@@ -224,9 +223,10 @@ public class GenericMethodCRUD {
     /**
      * Insère un objet dans la table correspondante.
      * Ignore le premier champ (id auto-généré).
-     * @return l'id généré, ou -1 si non disponible
+     * @return l'objet inséré avec son ID mis à jour
      */
-    public int insertData(Object obj) throws Exception {
+    @SuppressWarnings("unchecked")
+    public <T> T insertData(T obj) throws Exception {
         String table = tableNomDepuisClasse(obj);
         Field[] champs = obj.getClass().getDeclaredFields();
 
@@ -277,13 +277,25 @@ public class GenericMethodCRUD {
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     int genId = rs.getInt(1);
+                    // Mettre à jour l'ID de l'objet via réflexion
+                    try {
+                        Field idField = obj.getClass().getDeclaredField("id");
+                        idField.setAccessible(true);
+                        idField.set(obj, genId);
+                    } catch (NoSuchFieldException e) {
+                        try {
+                            Field idField = obj.getClass().getSuperclass().getDeclaredField("id");
+                            idField.setAccessible(true);
+                            idField.set(obj, genId);
+                        } catch (Exception e2) {
+                            // Pas de champ id trouvé
+                        }
+                    }
                     System.out.println("[CRUD] insertData → id généré=" + genId + " dans " + table);
-                    return genId;
                 }
             }
         }
-        System.out.println("[CRUD] insertData → insertion réussie dans " + table + " (pas d'id retourné)");
-        return -1;
+        return obj;
     }
 
     // ── update ────────────────────────────────────────────────────────────────

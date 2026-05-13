@@ -14,15 +14,15 @@ public class GenericMethodDAO<T> extends GenericMethodCRUD {
 
     // ── INSERT ────────────────────────────────────────────────────────────────
     /**
-     * Insère un objet et retourne l'id généré (-1 si non disponible).
+     * Insère un objet et retourne l'objet inséré (avec son ID mis à jour).
      */
-    public int insert(T obj) {
+    public T insert(T obj) {
         try {
             return this.insertData(obj);
         } catch (Exception e) {
             System.err.println("[DAO] Échec d'insertion: " + e.getMessage());
             e.printStackTrace();
-            return -1;
+            return obj;
         }
     }
 

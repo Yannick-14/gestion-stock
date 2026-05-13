@@ -62,7 +62,8 @@ public class StockMovementScreen extends AbstractFormScreen<StockMovement> {
                     "Succès", JOptionPane.INFORMATION_MESSAGE);
             } else {
                 // LOGIQUE D'ENTRÉE : Insertion simple
-                int id = crud.insertData(request);
+                request = crud.insertData(request);
+                int id = request.getId();
                 JOptionPane.showMessageDialog(this, 
                     "Entrée enregistrée avec succès ! (id=" + id + ")", 
                     "Succès", JOptionPane.INFORMATION_MESSAGE);

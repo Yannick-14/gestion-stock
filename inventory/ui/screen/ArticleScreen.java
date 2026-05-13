@@ -40,14 +40,15 @@ public class ArticleScreen extends AbstractFormScreen<Article> {
             
             // Date de création automatique
             article.setCreatedAt(new java.sql.Timestamp(System.currentTimeMillis()));
-            
+
             // Insertion via CRUD
-            int id = crud.insertData(article);
-            
+            article = crud.insertData(article);
+            int id = article.getId();
+
             JOptionPane.showMessageDialog(this,
                 "Article enregistré avec succès ! (id=" + id + ")",
                 "Succès", JOptionPane.INFORMATION_MESSAGE);
-                
+
             // Réinitialiser le formulaire après l'enregistrement réussi
             resetForm();
 
