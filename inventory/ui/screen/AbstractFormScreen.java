@@ -9,6 +9,8 @@ import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.sql.Timestamp;
+import inventory.feature.repository.dao.GenericMethodCRUD;
 /**
  * Classe de base abstraite pour tous les écrans contenant un formulaire.
  * Elle gère le design, le titre, le scroll et la liste d'actions (boutons).
@@ -31,6 +33,7 @@ public abstract class AbstractFormScreen<T> extends JPanel {
     protected String title;
     protected List<FormAction> additionalActions;
     protected T modelInstance; // Garder une référence à l'instance du modèle
+    protected final GenericMethodCRUD crud = new GenericMethodCRUD();
 
     /**
      * Constructeur principal.
@@ -49,47 +52,85 @@ public abstract class AbstractFormScreen<T> extends JPanel {
      * Méthode abstraite à implémenter pour définir la logique d'enregistrement.
      * Chaque écran doit fournir sa propre implémentation de save.
      */
-    protected abstract void saveData();
+     protected void saveData() {
+        try {
+            // Créer une instance vierge et la remplir via le formulaire
+            T data = createNewInstance();
+            data = form.getData(data);
+            
+            // Définir la date de création automatiquement
+            setCreatedAtIfExists(data);
+ 
+            // Insertion via CRUD générique
+            T saved = crud.insertData(data);
+            int id = getIdIfExists(saved);
+ 
+            // Message de succès
+            String message = id > 0 
+                ? "Enregistrement réussi ! (id=" + id + ")"
+                : "Enregistrement réussi !";
+            
+            JOptionPane.showMessageDialog(this, message, "Succès", JOptionPane.INFORMATION_MESSAGE);
+ 
+            // Réinitialiser le formulaire
+            resetForm();
+ 
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                "Erreur : " + ex.getMessage(),
+                "Erreur", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+        }
+    }
+ 
+    /**
+     * Crée une nouvelle instance de T (par réflexion).
+     */
+    @SuppressWarnings("unchecked")
+    protected T createNewInstance() {
+        try {
+            return (T) modelInstance.getClass().getDeclaredConstructor().newInstance();
+        } catch (Exception ex) {
+            throw new RuntimeException("Impossible de créer une instance de " + modelInstance.getClass().getSimpleName(), ex);
+        }
+    }
+ 
+    /**
+     * Définit createdAt si la méthode setCreatedAt existe.
+     */
+    protected void setCreatedAtIfExists(T data) {
+        try {
+            var method = data.getClass().getMethod("setCreatedAt", java.sql.Timestamp.class);
+            method.invoke(data, new Timestamp(System.currentTimeMillis()));
+        } catch (NoSuchMethodException ex) {
+            // La classe n'a pas de createdAt, c'est OK
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+ 
+    /**
+     * Récupère l'ID si la méthode getId existe.
+     */
+    protected int getIdIfExists(T data) {
+        try {
+            var method = data.getClass().getMethod("getId");
+            Object result = method.invoke(data);
+            return result instanceof Integer ? (Integer) result : 0;
+        } catch (NoSuchMethodException ex) {
+            return 0;
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return 0;
+        }
+    }
 
     /**
      * Réinitialise le formulaire avec les valeurs par défaut.
      * Peut être surchargée pour personnaliser le comportement de reset.
      */
     protected void resetForm() {
-        try {
-            // Supprimer l'ancien formulaire
-            Container parent = form.getParent();
-            if (parent != null) {
-                int index = -1;
-                for (int i = 0; i < parent.getComponentCount(); i++) {
-                    if (parent.getComponent(i) == form) {
-                        index = i;
-                        break;
-                    }
-                }
-                
-                if (index != -1) {
-                    parent.remove(form);
-                    
-                    // Créer une nouvelle instance propre du modèle
-                    T newInstance = createNewModelInstance();
-                    
-                    // Créer un nouveau formulaire avec cette instance
-                    this.form = new Form<>(newInstance);
-
-                    // Ajouter le nouveau formulaire à la même position
-                    parent.add(form, index);
-                    parent.revalidate();
-                    parent.repaint();
-                }
-            }
-            
-            // JOptionPane.showMessageDialog(this, "Formulaire réinitialisé avec succès.", "Réinitialisation", JOptionPane.INFORMATION_MESSAGE);
-                
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Erreur lors de la réinitialisation : " + e.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
-            e.printStackTrace();
-        }
+        form.reset();
     }
 
     /**

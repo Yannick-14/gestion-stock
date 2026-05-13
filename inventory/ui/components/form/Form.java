@@ -296,4 +296,21 @@ public class Form<T> extends JPanel {
     public JPanel getFieldComponent(String fieldName) {
         return fields.get(fieldName);
     }
+
+    public void reset() {
+        for (JPanel fieldPanel : fields.values()) {
+            if (fieldPanel instanceof FieldInput) {
+                FieldInput fieldInput = (FieldInput) fieldPanel;
+                fieldInput.getTextField().setText("");
+            } else if (fieldPanel instanceof FieldSelect) {
+                FieldSelect<?> fieldSelect = (FieldSelect<?>) fieldPanel;
+                if (fieldSelect.getComboBox().getItemCount() > 0) {
+                    fieldSelect.getComboBox().setSelectedIndex(0);
+                }
+            } else if (fieldPanel instanceof FieldDate) {
+                FieldDate fieldDate = (FieldDate) fieldPanel;
+                fieldDate.getDatePicker().getTextField().setText("");
+            }
+        }
+    }
 }
