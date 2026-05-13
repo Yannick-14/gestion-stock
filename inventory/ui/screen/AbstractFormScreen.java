@@ -186,7 +186,7 @@ public abstract class AbstractFormScreen<T> extends JPanel {
         scrollPane.setOpaque(false);
         scrollPane.getViewport().setOpaque(false);
         scrollPane.getVerticalScrollBar().setUnitIncrement(12);
-        
+
         add(scrollPane, BorderLayout.CENTER);
     }
 
