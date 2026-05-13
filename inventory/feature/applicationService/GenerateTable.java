@@ -171,12 +171,6 @@ public class GenerateTable {
         return colonnes;
     }
 
-    /**
-     * Retourne le nom de colonne SQL pour un champ Java.
-     * - Champ "id"            → "id"
-     * - Champ objet métier    → "id_" + snake_case
-     * - Autres               → snake_case du nom de champ
-     */
     private String getNomColonne(Field champ) {
         if (champ.getName().equals("id")) return "id";
         if (isMetierType(champ.getType())) {
@@ -185,34 +179,24 @@ public class GenerateTable {
         return toSnakeCase(champ.getName());
     }
 
-    /**
-     * Retourne le type SQL correspondant au type Java du champ.
-     */
     private String getSqlType(Field champ) {
         if (champ.getName().equals("id")) return "SERIAL PRIMARY KEY";
 
         Class<?> type = champ.getType();
 
-        if (isMetierType(type))                    return "INT";
-        if (type == String.class)                  return "VARCHAR(255)";
+        if (isMetierType(type)) return "INT";
+        if (type == String.class) return "VARCHAR(255)";
         if (type == int.class || type == Integer.class) return "INT";
-        if (type == long.class || type == Long.class)   return "BIGINT";
-        if (type == double.class || type == Double.class
-         || type == float.class  || type == Float.class) return "DOUBLE PRECISION";
+        if (type == long.class || type == Long.class) return "BIGINT";
+        if (type == double.class || type == Double.class || type == float.class  || type == Float.class) return "DOUBLE PRECISION";
         if (type == boolean.class || type == Boolean.class) return "BOOLEAN";
-        if (type == java.sql.Timestamp.class
-         || type == java.time.LocalDateTime.class)  return "TIMESTAMP";
-        if (type == java.sql.Date.class
-         || type == java.util.Date.class
-         || type == java.time.LocalDate.class)      return "DATE";
-        if (type == byte[].class)                  return "BYTEA";
+        if (type == java.sql.Timestamp.class || type == java.time.LocalDateTime.class) return "TIMESTAMP";
+        if (type == java.sql.Date.class || type == java.util.Date.class || type == java.time.LocalDate.class) return "DATE";
+        if (type == byte[].class) return "BYTEA";
 
         return "TEXT"; // fallback
     }
 
-    /**
-     * Vérifie si un type est un objet métier (ni primitif, ni String, ni date Java standard).
-     */
     private boolean isMetierType(Class<?> type) {
         if (type.isPrimitive()) return false;
         if (type == String.class) return false;
@@ -226,10 +210,6 @@ public class GenerateTable {
         return true; // c'est un objet métier → FK
     }
 
-    /**
-     * Convertit un nom camelCase/PascalCase en snake_case.
-     * Ex: "stockManagementMethod" → "stock_management_method"
-     */
     public static String toSnakeCase(String name) {
         if (name == null || name.isEmpty()) return name;
         return name

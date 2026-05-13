@@ -37,44 +37,40 @@ public class StockMovementScreen extends AbstractFormScreen<StockMovement> {
     @Override
     protected void saveData() {
         try {
-            // Récupérer les données de base du formulaire
-            StockMovement request = new StockMovement();
+            StockMovement request = createNewInstance();
             request = form.getData(request);
-            request.setCreatedAt(new java.sql.Timestamp(System.currentTimeMillis()));
-
-            // Générer la référence de transaction UNIQUE pour cette opération
+            setCreatedAtIfExists(request);
+ 
+            // Générer une référence UNIQUE pour cette opération
             String ref = "REF-" + System.currentTimeMillis();
             request.setTransactionRef(ref);
-
-            String typeName = request.getTypeStockMovement() != null ? 
-                              request.getTypeStockMovement().getNameType().toLowerCase() : "";
-
+ 
+            String typeName = request.getTypeStockMovement() != null 
+                ? request.getTypeStockMovement().getNameType().toLowerCase() 
+                : "";
+ 
             if (typeName.contains("sort")) {
-                // LOGIQUE DE SORTIE : Utilisation du StockManager pour le découpage FIFO/LIFO/CUMP
-                List<StockMovement> toInsert = stockManager.prepareExit(request);
+                // LOGIQUE DE SORTIE : FIFO/LIFO/CUMP
+                List<StockMovement> toInsert = stockManager.processExitRequest(request);
                 
                 for (StockMovement m : toInsert) {
                     crud.insertData(m);
                 }
                 
                 JOptionPane.showMessageDialog(this,
-                    "Sortie enregistrée avec succès en " + toInsert.size() + " ligne(s) de mouvement.",
+                    "Sortie enregistrée avec succès en " + toInsert.size() + " ligne(s).",
                     "Succès", JOptionPane.INFORMATION_MESSAGE);
             } else {
-                // LOGIQUE D'ENTRÉE : Insertion simple
-                int id = crud.insertData(request);
-                JOptionPane.showMessageDialog(this, 
-                    "Entrée enregistrée avec succès ! (id=" + id + ")", 
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+                // LOGIQUE D'ENTRÉE : Insertion simple (utilise la classe parente)
+                super.saveData();
+                return;
             }
-
-            // Réinitialiser le formulaire
+ 
             resetForm();
-
+ 
         } catch (Exception ex) {
-            System.err.println("Erreur lors de l'enregistrement : " + ex.getMessage());
-            JOptionPane.showMessageDialog(this, 
-                "Erreur : " + ex.getMessage(), 
+            JOptionPane.showMessageDialog(this,
+                "Erreur : " + ex.getMessage(),
                 "Erreur", JOptionPane.ERROR_MESSAGE);
             ex.printStackTrace();
         }

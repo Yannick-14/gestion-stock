@@ -56,6 +56,12 @@ public class StockMovement {
     public String getTransactionRef() { return transactionRef; }
     public void setTransactionRef(String transactionRef) { this.transactionRef = transactionRef; }
 
+    public boolean isMovementIn() {
+        return typeStockMovement != null && 
+               typeStockMovement.getNameType() != null && 
+               typeStockMovement.getNameType().toLowerCase().contains("entr");
+    }
+
     @Override
     public String toString() {
         return "StockMovement{id=" + id

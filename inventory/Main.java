@@ -28,7 +28,8 @@ public class Main {
             migration.migrate();
 
             // 2. Migration de données (insertions initiales)
-            // GenericMethodCRUD crud = new GenericMethodCRUD();
+            GenericMethodCRUD crud = new GenericMethodCRUD();
+            crud.insertData(new TypeStockMovement("Sortie"));
 
             // System.out.println("\n[Main] Vérification et insertion des données initiales...");
 

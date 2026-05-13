@@ -1,5 +1,6 @@
 package inventory.ui.components.table;
 
+import inventory.ui.components.button.Button;
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
@@ -10,10 +11,8 @@ import java.util.List;
 import java.util.Date;
 
 /**
- * Composant tableau générique.
- * On passe un objet T pour en déduire les colonnes par réflexion.
- * On peut passer des filtres (TableFilter) pour filtrer l'affichage.
- *
+ * Composant tableau générique avec filtres appliqués au clic d'un bouton.
+ * 
  * Usage:
  *   PanelList<Article> list = new PanelList<>(new Article(), articles, filters);
  */
@@ -23,10 +22,16 @@ public class PanelList<T> extends JPanel {
     private final String[] columnNames;
     private final Field[] fields;
 
+    private CardLayout cardLayout;
+    private JPanel cardPanel;
+
     private DefaultTableModel tableModel;
     private JTable table;
     private List<T> allData;
-    private List<T> currentData; // Liste actuellement affichée (après filtrage)
+    private List<T> currentData;
+
+    private JLabel emptyLabel;
+    // private JPanel tableContainerPanel;
 
     private final List<TableFilter> filters;
     private final List<JComponent> filterInputs = new ArrayList<>();
@@ -44,7 +49,9 @@ public class PanelList<T> extends JPanel {
         // Champs existants (sans id)
         List<Field> visibleFields = new ArrayList<>();
         for (Field f : modelClass.getDeclaredFields()) {
-            if (!f.getName().equals("id")) visibleFields.add(f);
+            if (!f.getName().equals("id") && !f.getName().equals("serialVersionUID")) {
+                visibleFields.add(f);
+            }
         }
         this.fields = visibleFields.toArray(new Field[0]);
         this.columnNames = buildColumnNames();
@@ -84,49 +91,66 @@ public class PanelList<T> extends JPanel {
         return allNames;
     }
 
-    // ── Panel filtres ─────────────────────────────────────────────────────────
-
     private JPanel buildFilterPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
-        panel.setBackground(new Color(235, 238, 248));
-        panel.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+        JPanel mainPanel = new JPanel(new BorderLayout(0, 8));
+        mainPanel.setBackground(new Color(235, 238, 248));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+
+        // Panel gauche : champs de filtre
+        JPanel filterFieldsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
+        filterFieldsPanel.setBackground(new Color(235, 238, 248));
 
         for (TableFilter filter : filters) {
             JLabel lbl = new JLabel(filter.getLabel() + ":");
             lbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-            panel.add(lbl);
+            filterFieldsPanel.add(lbl);
 
             JComponent input;
             if (filter.getType() == TableFilter.FilterType.SELECT && filter.getOptions() != null) {
                 JComboBox<Object> combo = new JComboBox<>();
                 combo.addItem("-- Tous --");
-                for (Object opt : filter.getOptions()) combo.addItem(opt);
+                for (Object opt : filter.getOptions()) {
+                    combo.addItem(opt);
+                }
                 combo.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                combo.addActionListener(e -> applyFilters());
+                combo.setPreferredSize(new Dimension(140, 30));
                 input = combo;
             } else {
                 JTextField tf = new JTextField(12);
                 tf.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                tf.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-                    public void insertUpdate(javax.swing.event.DocumentEvent e) { applyFilters(); }
-                    public void removeUpdate(javax.swing.event.DocumentEvent e) { applyFilters(); }
-                    public void changedUpdate(javax.swing.event.DocumentEvent e) { applyFilters(); }
-                });
+                tf.setPreferredSize(new Dimension(140, 30));
                 input = tf;
             }
             filterInputs.add(input);
-            panel.add(input);
+            filterFieldsPanel.add(input);
         }
 
-        return panel;
+        // Panel droit : boutons
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
+        buttonPanel.setBackground(new Color(235, 238, 248));
+
+        Button filterButton = new Button("🔍 Filtrer", Button.Style.PRIMARY);
+        filterButton.addActionListener(e -> applyFilters());
+
+        Button resetButton = new Button("↻ Réinitialiser", Button.Style.SECONDARY);
+        resetButton.addActionListener(e -> resetFilters());
+
+        buttonPanel.add(filterButton);
+        buttonPanel.add(resetButton);
+
+        // Assemblage
+        mainPanel.add(filterFieldsPanel, BorderLayout.CENTER);
+        mainPanel.add(buttonPanel, BorderLayout.EAST);
+
+        return mainPanel;
     }
 
     // ── Panel tableau ─────────────────────────────────────────────────────────
 
-    private JScrollPane buildTablePanel() {
+    private JPanel buildTablePanel() {
         tableModel = new DefaultTableModel(columnNames, 0) {
-            @Override public boolean isCellEditable(int row, int col) {
-                // Seules les colonnes boutons sont éditables (pour le clic)
+            @Override
+            public boolean isCellEditable(int row, int col) {
                 int customColIndex = col - fields.length;
                 if (customColIndex >= 0 && customColIndex < customColumns.size()) {
                     return customColumns.get(customColIndex).isButtonColumn();
@@ -136,7 +160,27 @@ public class PanelList<T> extends JPanel {
         };
         table = new JTable(tableModel);
         styleTable();
-        return new JScrollPane(table);
+
+        cardLayout = new CardLayout();
+        cardPanel = new JPanel(cardLayout);
+        cardPanel.setBackground(Color.WHITE);
+
+        // ✅ Card 1 : Tableau AVEC scroll
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBackground(Color.WHITE);
+        cardPanel.add(scrollPane, "table");
+
+        // ✅ Card 2 : Message "Aucune donnée" (pas besoin de scroll)
+        emptyLabel = new JLabel("Aucune donnée à afficher pour " + modelClass.getSimpleName(), SwingConstants.CENTER);
+        emptyLabel.setFont(new Font("Segoe UI", Font.ITALIC, 16));
+        emptyLabel.setForeground(new Color(255, 200, 0));
+        emptyLabel.setOpaque(true);
+        emptyLabel.setBackground(new Color(255, 242, 204));
+        cardPanel.add(emptyLabel, "empty");
+
+        cardLayout.show(cardPanel, "table");
+
+        return cardPanel;
     }
 
     private void styleTable() {
@@ -183,38 +227,43 @@ public class PanelList<T> extends JPanel {
     /** Met à jour les données complètes et rafraîchit. */
     public void setData(List<T> data) {
         this.allData = new ArrayList<>(data);
-        applyFilters();
+        resetFilters();
     }
 
     /** Rafraîchit le tableau avec une liste filtrée. */
     private void refreshTable(List<T> data) {
         this.currentData = new ArrayList<>(data);
         tableModel.setRowCount(0);
-        for (T item : data) {
-            Object[] row = new Object[fields.length + customColumns.size()];
 
-            // Colonnes de base (réflexion)
-            for (int i = 0; i < fields.length; i++) {
-                fields[i].setAccessible(true);
-                try {
-                    Object val = fields[i].get(item);
-                    row[i] = formatCellValue(val);
-                } catch (Exception e) {
-                    row[i] = "";
+        if (data.isEmpty()) {
+            cardLayout.show(cardPanel, "empty");
+        } else {
+            cardLayout.show(cardPanel, "table");
+            
+            for (T item : data) {
+                Object[] row = new Object[fields.length + customColumns.size()];
+
+                for (int i = 0; i < fields.length; i++) {
+                    fields[i].setAccessible(true);
+                    try {
+                        Object val = fields[i].get(item);
+                        row[i] = formatCellValue(val);
+                    } catch (Exception e) {
+                        row[i] = "";
+                    }
                 }
-            }
 
-            // Colonnes personnalisées
-            int base = fields.length;
-            for (int i = 0; i < customColumns.size(); i++) {
-                row[base + i] = customColumns.get(i).getValue(item);
-            }
+                int base = fields.length;
+                for (int i = 0; i < customColumns.size(); i++) {
+                    row[base + i] = customColumns.get(i).getValue(item);
+                }
 
-            tableModel.addRow(row);
+                tableModel.addRow(row);
+            }
         }
     }
 
-    // formater la valeur d'une cellule de table data
+    // Formater la valeur d'une cellule de table data
     private String formatCellValue(Object value) {
         if (value == null) {
             return "";
@@ -230,16 +279,25 @@ public class PanelList<T> extends JPanel {
 
     // ── Filtrage ──────────────────────────────────────────────────────────────
 
+    /**
+     * Applique les filtres au clic du bouton "Filtrer"
+     */
     private void applyFilters() {
         List<T> filtered = new ArrayList<>(allData);
+        
         for (int fi = 0; fi < filters.size(); fi++) {
-            TableFilter tf   = filters.get(fi);
-            JComponent  comp = filterInputs.get(fi);
+            TableFilter tf = filters.get(fi);
+            JComponent comp = filterInputs.get(fi);
             String filterVal = getFilterValue(comp);
-            if (filterVal == null || filterVal.isEmpty() || filterVal.equals("-- Tous --")) continue;
+
+            // Ignorer les filtres vides
+            if (filterVal == null || filterVal.isEmpty() || filterVal.equals("-- Tous --")) {
+                continue;
+            }
 
             final String fVal = filterVal.toLowerCase();
             List<T> temp = new ArrayList<>();
+            
             for (T item : filtered) {
                 String cellVal = getFieldStringValue(item, tf.getFieldName());
                 if (cellVal != null && cellVal.toLowerCase().contains(fVal)) {
@@ -248,11 +306,31 @@ public class PanelList<T> extends JPanel {
             }
             filtered = temp;
         }
+        
         refreshTable(filtered);
     }
 
+    /**
+     * Réinitialise les filtres et affiche toutes les données
+     */
+    private void resetFilters() {
+        // Vider tous les champs de filtre
+        for (JComponent comp : filterInputs) {
+            if (comp instanceof JTextField) {
+                ((JTextField) comp).setText("");
+            } else if (comp instanceof JComboBox) {
+                ((JComboBox<?>) comp).setSelectedIndex(0);
+            }
+        }
+
+        // Afficher toutes les données
+        refreshTable(allData);
+    }
+
     private String getFilterValue(JComponent comp) {
-        if (comp instanceof JTextField) return ((JTextField) comp).getText().trim();
+        if (comp instanceof JTextField) {
+            return ((JTextField) comp).getText().trim();
+        }
         if (comp instanceof JComboBox) {
             Object sel = ((JComboBox<?>) comp).getSelectedItem();
             return sel != null ? sel.toString() : "";
@@ -287,12 +365,22 @@ public class PanelList<T> extends JPanel {
         return result.substring(0, 1).toUpperCase() + result.substring(1).toLowerCase();
     }
 
-    public JTable getTable() { return table; }
+    public JTable getTable() { 
+        return table; 
+    }
 
     public T getItemAtRow(int row) {
         if (row >= 0 && row < currentData.size()) {
             return currentData.get(row);
         }
         return null;
+    }
+
+    public List<T> getCurrentData() {
+        return new ArrayList<>(currentData);
+    }
+
+    public List<T> getAllData() {
+        return new ArrayList<>(allData);
     }
 }

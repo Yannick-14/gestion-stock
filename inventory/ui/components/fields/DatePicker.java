@@ -1,10 +1,11 @@
 package inventory.ui.components.fields;
 
+import inventory.ui.components.button.Button;
 import javax.swing.*;
 import javax.swing.border.CompoundBorder;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+// import java.awt.event.ActionEvent;
+// import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.time.LocalDate;
@@ -17,7 +18,7 @@ import java.util.Locale;
  */
 public class DatePicker extends JPanel {
     private final JTextField textField;
-    private final JButton calendarButton;
+    private final Button calendarButton;
     private LocalDate selectedDate;
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -40,11 +41,12 @@ public class DatePicker extends JPanel {
             BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
             BorderFactory.createEmptyBorder(6, 10, 6, 10)
         ));
-        
+
         // Bouton avec icône (ou texte si pas d'image)
-        calendarButton = new JButton("📅");
+        calendarButton = new Button("📅", Button.Style.SECONDARY);
         calendarButton.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         calendarButton.setFocusable(false);
+        calendarButton.setForeground(Color.BLUE);
         calendarButton.setBackground(new Color(240, 240, 240));
         calendarButton.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(1, 0, 1, 1, new Color(200, 200, 200)),
@@ -101,15 +103,17 @@ public class DatePicker extends JPanel {
 
         private void buildCalendar() {
             removeAll();
-            
+
             // Header: Mois Année + Navigation
             JPanel header = new JPanel(new BorderLayout());
             header.setBackground(new Color(245, 245, 245));
             header.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
-            JButton prev = createNavButton("<");
-            JButton next = createNavButton(">");
-            
+            Button prev = createNavButton("<");
+            Button next = createNavButton(">");
+            prev.setForeground(new Color(120, 120, 120));
+            next.setForeground(new Color(120, 120, 120));
+
             String monthName = currentView.getMonth().getDisplayName(TextStyle.FULL, Locale.FRENCH);
             JLabel label = new JLabel(monthName.substring(0, 1).toUpperCase() + monthName.substring(1) + " " + currentView.getYear(), SwingConstants.CENTER);
             label.setFont(new Font("Segoe UI", Font.BOLD, 13));
@@ -141,9 +145,10 @@ public class DatePicker extends JPanel {
 
             int daysInMonth = currentView.lengthOfMonth();
             for (int day = 1; day <= daysInMonth; day++) {
-                final int d = day;
-                JButton btn = new JButton(String.valueOf(day));
+                // final int d = day;
+                Button btn = new Button(String.valueOf(day));
                 btn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                btn.setForeground(new Color(120, 120, 120));
                 btn.setFocusPainted(false);
                 btn.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
                 btn.setContentAreaFilled(false);
@@ -176,8 +181,8 @@ public class DatePicker extends JPanel {
             repaint();
         }
 
-        private JButton createNavButton(String text) {
-            JButton b = new JButton(text);
+        private Button createNavButton(String text) {
+            Button b = new Button(text, Button.Style.SECONDARY);
             b.setFont(new Font("Monospaced", Font.BOLD, 14));
             b.setFocusPainted(false);
             b.setBorderPainted(false);

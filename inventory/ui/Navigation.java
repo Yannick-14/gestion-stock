@@ -64,9 +64,9 @@ public class Navigation extends JPanel {
         sidebar.add(Box.createVerticalStrut(10));
 
         // Entrées de navigation
-        Button btnHome      = createNavButton("🏠  Accueil");
-        Button btnArticle   = createNavButton("📦  Insertion Article");
-        Button btnMouvement = createNavButton("🔄  Mouvement de Stock");
+        Button btnHome = createNavButton("Accueil");
+        Button btnArticle = createNavButton("Insertion Article");
+        Button btnMouvement = createNavButton("Mouvement de Stock");
 
         btnHome.addActionListener(e -> {
             setActive(btnHome);
@@ -102,7 +102,7 @@ public class Navigation extends JPanel {
         btn.setHorizontalAlignment(SwingConstants.LEFT);
         btn.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         btn.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 10));
-        btn.setBackground(new Color(30, 40, 65)); // même couleur sidebar = transparent
+        btn.setBackground(new Color(30, 40, 65));
         return btn;
     }
 

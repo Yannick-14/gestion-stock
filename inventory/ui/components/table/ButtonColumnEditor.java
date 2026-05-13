@@ -2,17 +2,17 @@ package inventory.ui.components.table;
 
 import inventory.ui.components.button.Button;
 import javax.swing.*;
-import javax.swing.table.*;
+// import javax.swing.table.*;
 import java.awt.*;
 import java.util.function.Consumer;
 
 /**
  * Editor pour les boutons dans les tableaux.
- * Enveloppe un JButton dans un JPanel pour correspondre au design du renderer.
+ * Enveloppe un Button dans un JPanel pour correspondre au design du renderer.
  */
 public class ButtonColumnEditor extends DefaultCellEditor {
     private final JPanel panel;
-    private final JButton button;
+    private final Button button;
     private String label;
     private boolean isPushed;
     private final Consumer<Object> action;
@@ -23,8 +23,8 @@ public class ButtonColumnEditor extends DefaultCellEditor {
         
         panel = new JPanel(new GridBagLayout());
         panel.setOpaque(true);
-        
-        button = new JButton();
+
+        button = new Button("");
         button.setOpaque(true);
         button.setBorderPainted(false);
         button.setFont(new Font("Segoe UI", Font.BOLD, 11));
@@ -39,10 +39,10 @@ public class ButtonColumnEditor extends DefaultCellEditor {
             boolean isSelected, int row, int column) {
         label = (value == null) ? "Voir" : value.toString();
         button.setText(label);
-        
+
         // Match selection colors
         panel.setBackground(table.getSelectionBackground());
-        
+
         isPushed = true;
         return panel;
     }
@@ -58,19 +58,15 @@ public class ButtonColumnEditor extends DefaultCellEditor {
 
     public void setStyle(Button.Style style) {
         if (style == null) style = Button.Style.PRIMARY;
+        button.setBackground(getBackgroundForStyle(style));
+        button.setForeground(Color.WHITE);
+    }
+
+    private Color getBackgroundForStyle(Button.Style style) {
         switch (style) {
-            case PRIMARY:
-                button.setBackground(new Color(52, 120, 246));
-                button.setForeground(Color.WHITE);
-                break;
-            case SECONDARY:
-                button.setBackground(new Color(85, 95, 110));
-                button.setForeground(Color.WHITE);
-                break;
-            case DANGER:
-                button.setBackground(new Color(220, 53, 69));
-                button.setForeground(Color.WHITE);
-                break;
+            case SECONDARY: return new Color(85, 95, 110);
+            case DANGER: return new Color(220, 53, 69);
+            default: return new Color(52, 120, 246);
         }
     }
 }

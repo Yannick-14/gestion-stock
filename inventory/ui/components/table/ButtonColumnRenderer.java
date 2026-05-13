@@ -7,16 +7,16 @@ import java.awt.*;
 
 /**
  * Renderer pour les boutons dans les tableaux.
- * Enveloppe un JButton dans un JPanel pour ajouter du padding.
+ * Enveloppe un Button dans un JPanel pour ajouter du padding.
  */
 public class ButtonColumnRenderer extends JPanel implements TableCellRenderer {
-    private final JButton button;
+    private final Button button;
 
     public ButtonColumnRenderer() {
         setLayout(new GridBagLayout()); // Permet de centrer et de respecter les dimensions
         setOpaque(true);
         
-        button = new JButton();
+        button = new Button("");
         button.setOpaque(true);
         button.setBorderPainted(false);
         button.setFont(new Font("Segoe UI", Font.BOLD, 11));
@@ -43,19 +43,15 @@ public class ButtonColumnRenderer extends JPanel implements TableCellRenderer {
 
     public void setStyle(Button.Style style) {
         if (style == null) style = Button.Style.PRIMARY;
+        button.setBackground(getBackgroundForStyle(style));
+        button.setForeground(Color.WHITE);
+    }
+
+    private Color getBackgroundForStyle(Button.Style style) {
         switch (style) {
-            case PRIMARY:
-                button.setBackground(new Color(52, 120, 246));
-                button.setForeground(Color.WHITE);
-                break;
-            case SECONDARY:
-                button.setBackground(new Color(85, 95, 110)); // Gris plus doux
-                button.setForeground(Color.WHITE);
-                break;
-            case DANGER:
-                button.setBackground(new Color(220, 53, 69));
-                button.setForeground(Color.WHITE);
-                break;
+            case SECONDARY: return new Color(85, 95, 110);
+            case DANGER: return new Color(220, 53, 69);
+            default: return new Color(52, 120, 246);
         }
     }
 }

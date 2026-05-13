@@ -6,24 +6,28 @@ import inventory.ui.components.fields.FieldDate;
 import inventory.feature.repository.dao.GenericMethodCRUD;
 
 import javax.swing.*;
-import java.util.List;
+
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.function.Consumer;
 import inventory.feature.annotation.FormIgnore;
 
 /**
- * Formulaire générique COMPLÈTEMENT DYNAMIQUE.
+ * Formulaire générique ULTRA-DYNAMIQUE avec support Enums, Collections et validations.
  */
 public class Form<T> extends JPanel {
     private final Class<T> modelClass;
     private final GenericMethodCRUD crud;
-    private T instance;
+
+    T instance;
     private final Map<String, JPanel> fields = new LinkedHashMap<>();
 
     public Form(T instance) {
-        this.modelClass = (Class<T>) instance.getClass();
+        @SuppressWarnings("unchecked")
+        Class<T> modelClass = (Class<T>) instance.getClass();
+        this.modelClass = modelClass;
         this.crud = new GenericMethodCRUD();
+        this.instance = instance;
         
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setOpaque(false);
@@ -33,22 +37,6 @@ public class Form<T> extends JPanel {
 
     @Deprecated
     public Form(Class<T> modelClass) {
-        this.modelClass = modelClass;
-        this.crud = new GenericMethodCRUD();
-        try {
-            this.instance = modelClass.getDeclaredConstructor().newInstance();
-        } catch (Exception e) {
-            throw new RuntimeException("Impossible de créer une instance de " + modelClass.getName(), e);
-        }
-        
-        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        setOpaque(false);
-        
-        buildForm();
-    }
-
-    @Deprecated
-    public Form(Class<T> modelClass, Map<String, List<?>> options) {
         this.modelClass = modelClass;
         this.crud = new GenericMethodCRUD();
         try {
@@ -84,20 +72,45 @@ public class Form<T> extends JPanel {
 
     private JPanel createField(Field field, String label) {
         Class<?> fieldType = field.getType();
-        
-        if (isCustomObject(fieldType)) {
-            List<?> items = loadDataForType(fieldType);
-            
-            if (!items.isEmpty()) {
-                return createSelectField(label, items);
+
+        if (isEnumType(fieldType)) {
+            Enum<?>[] enumValues = (Enum<?>[]) fieldType.getEnumConstants();
+            List<String> enumNames = new ArrayList<>();
+            for (Enum<?> e : enumValues) {
+                enumNames.add(e.name());
             }
+            return new FieldSelect<>(label, enumNames);
         }
         
+        if (isCollectionType(fieldType)) {
+            // Pour une simple démo, ignorer les collections
+            System.out.println("[Form] Collection non supportée : " + fieldType.getSimpleName());
+            return null;
+        }
+
+        if (isCustomObject(fieldType)) {
+            List<?> items = loadDataForType(fieldType);
+            if (!items.isEmpty()) {
+                return new FieldSelect<>(label, items);
+            }
+        }
+
         if (isDateType(fieldType)) {
             return new FieldDate(label);
         }
-        
-        return createInputField(label);
+
+        // Types primitifs et String
+        return new FieldInput(label);
+    }
+
+    private boolean isEnumType(Class<?> type) {
+        return type.isEnum();
+    }
+
+    private boolean isCollectionType(Class<?> type) {
+        return List.class.isAssignableFrom(type) ||
+               Set.class.isAssignableFrom(type) ||
+               Collection.class.isAssignableFrom(type);
     }
 
     private boolean isDateType(Class<?> type) {
@@ -114,8 +127,8 @@ public class Form<T> extends JPanel {
             && !clazz.equals(Double.class)
             && !clazz.equals(Float.class)
             && !clazz.equals(Boolean.class)
-            && !clazz.equals(java.sql.Timestamp.class)
-            && !clazz.equals(java.util.Date.class);
+            && !isDateType(clazz)
+            && !isEnumType(clazz);
     }
 
     private List<?> loadDataForType(Class<?> typeClass) {
@@ -128,17 +141,9 @@ public class Form<T> extends JPanel {
         }
     }
 
-    private JPanel createSelectField(String label, List<?> items) {
-        return new FieldSelect<>(label, items);
-    }
-
-    private JPanel createInputField(String label) {
-        return new FieldInput(label);
-    }
-
     /**
      * Remplit l'objet avec les données du formulaire
-     * AVEC CONVERSION DE TYPES
+     * AVEC CONVERSION DE TYPES ET SUPPORT ENUMS
      */
     public T getData(T targetInstance) throws IllegalAccessException {
         for (Map.Entry<String, JPanel> entry : fields.entrySet()) {
@@ -172,7 +177,6 @@ public class Form<T> extends JPanel {
                     System.err.println("[Form] Champ non trouvé : " + fieldName);
                 } catch (IllegalArgumentException e) {
                     System.err.println("[Form] Erreur de conversion pour le champ " + fieldName + " : " + e.getMessage());
-                    e.printStackTrace();
                 }
             }
         }
@@ -181,12 +185,12 @@ public class Form<T> extends JPanel {
     }
 
     /**
-     * Convertit une valeur String en type approprié
+     * Convertit une valeur en type approprié (avec support Enums)
      */
     private Object convertValue(Object value, Class<?> targetType) {
         if (value == null) return null;
         
-        // Si la valeur est déjà du bon type, la retourner telle quelle
+        // Si la valeur est déjà du bon type
         if (targetType.isInstance(value)) {
             return value;
         }
@@ -194,6 +198,18 @@ public class Form<T> extends JPanel {
         String stringValue = value.toString().trim();
         if (stringValue.isEmpty()) return null;
         
+        // ✨ Support Enums
+        if (isEnumType(targetType)) {
+            try {
+                // Utiliser valueOf() par réflexion
+                java.lang.reflect.Method valueOfMethod = targetType.getDeclaredMethod("valueOf", String.class);
+                return valueOfMethod.invoke(null, stringValue);
+            } catch (Exception e) {
+                System.err.println("[Form] Enum invalide : " + stringValue);
+                return null;
+            }
+        }
+     
         try {
             // Types primitifs et leurs wrappers
             if (targetType == int.class || targetType == Integer.class) {
@@ -279,5 +295,22 @@ public class Form<T> extends JPanel {
 
     public JPanel getFieldComponent(String fieldName) {
         return fields.get(fieldName);
+    }
+
+    public void reset() {
+        for (JPanel fieldPanel : fields.values()) {
+            if (fieldPanel instanceof FieldInput) {
+                FieldInput fieldInput = (FieldInput) fieldPanel;
+                fieldInput.getTextField().setText("");
+            } else if (fieldPanel instanceof FieldSelect) {
+                FieldSelect<?> fieldSelect = (FieldSelect<?>) fieldPanel;
+                if (fieldSelect.getComboBox().getItemCount() > 0) {
+                    fieldSelect.getComboBox().setSelectedIndex(0);
+                }
+            } else if (fieldPanel instanceof FieldDate) {
+                FieldDate fieldDate = (FieldDate) fieldPanel;
+                fieldDate.getDatePicker().getTextField().setText("");
+            }
+        }
     }
 }

@@ -4,6 +4,7 @@ import inventory.feature.repository.dao.GenericMethodCRUD;
 import inventory.feature.stock.StockManager;
 import inventory.models.Article;
 import inventory.models.StockMovement;
+import inventory.models.StockState;
 import inventory.ui.components.button.Button;
 import inventory.ui.components.fields.FieldDate;
 import inventory.ui.components.table.CustomColumn;
@@ -72,7 +73,7 @@ public class HomeScreen extends JPanel {
 
         globalDateFilter = new FieldDate("Filtrer par date (jusqu'au)");
         globalDateFilter.getDatePicker().setPreferredSize(new Dimension(200, 32));
-        
+
         // Listener pour rechargement automatique
         globalDateFilter.getDatePicker().getTextField().getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             public void insertUpdate(javax.swing.event.DocumentEvent e) { refreshAllData(); }
@@ -86,7 +87,7 @@ public class HomeScreen extends JPanel {
     private void refreshAllData() {
         this.allMovements = loadMovements();
         List<Article> articles = loadArticles();
-        
+
         if (articlesList != null) articlesList.setData(articles);
         if (movementsList != null) movementsList.setData(allMovements);
     }
@@ -107,12 +108,6 @@ public class HomeScreen extends JPanel {
         this.allMovements = loadMovements();
 
         List<CustomColumn<Article>> customColumns = List.of(
-            new CustomColumn<Article>() {
-                @Override public String getName() { return "Méthode"; }
-                @Override public Object getValue(Article a) { 
-                    return a.getStockManagementMethod() != null ? a.getStockManagementMethod().getNameMethod() : "CUMP"; 
-                }
-            },
             createStockBalanceColumn(),
             createStockValueColumn(),
             createViewMovementsButtonColumn()
@@ -135,8 +130,8 @@ public class HomeScreen extends JPanel {
         panel.add(lbl, BorderLayout.NORTH);
 
         List<TableFilter> filters = Arrays.asList(
-            new TableFilter("article",            "Article"),
-            new TableFilter("typeStockMovement",  "Type")
+            new TableFilter("article", "Article"),
+            new TableFilter("typeStockMovement", "Type")
         );
 
         this.movementsList = new PanelList<>(new StockMovement(), allMovements, filters);
@@ -149,7 +144,7 @@ public class HomeScreen extends JPanel {
     private List<Article> loadArticles() {
         try {
             List<Article> list = crud.findAllData(new Article());
-            
+
             // Filtre par date
             if (globalDateFilter != null) {
                 String dateStr = globalDateFilter.getText();
@@ -170,7 +165,7 @@ public class HomeScreen extends JPanel {
     private List<StockMovement> loadMovements() {
         try {
             List<StockMovement> list = crud.findAllData(new StockMovement());
-            
+
             // Filtre par date
             if (globalDateFilter != null) {
                 String dateStr = globalDateFilter.getText();
@@ -194,7 +189,7 @@ public class HomeScreen extends JPanel {
             @Override public String getName() { return "Qte Stock"; }
             @Override public Object getValue(Article article) {
                 if (article.getId() == 0) return 0;
-                StockManager.StockState state = stockManager.calculateStockState(article, allMovements);
+                StockState state = stockManager.calculateStockState(article, allMovements);
                 return state.quantity;
             }
         };
@@ -205,7 +200,7 @@ public class HomeScreen extends JPanel {
             @Override public String getName() { return "Valeur Totale"; }
             @Override public Object getValue(Article article) {
                 if (article.getId() == 0) return "0.00 Ar";
-                StockManager.StockState state = stockManager.calculateStockState(article, allMovements);
+                StockState state = stockManager.calculateStockState(article, allMovements);
                 return String.format("%.2f Ar", state.totalValue);
             }
         };
@@ -226,14 +221,14 @@ public class HomeScreen extends JPanel {
         List<StockMovement> filtered = allMovements.stream()
             .filter(m -> m.getArticle() != null && m.getArticle().getId() == article.getId())
             .toList();
-        
+
         Window parentWindow = SwingUtilities.getWindowAncestor(this);
         JDialog dialog = new JDialog(parentWindow instanceof Frame ? (Frame) parentWindow : null, 
             "Mouvements : " + article.getNameArticle(), true);
         dialog.setSize(900, 500);
         dialog.setLocationRelativeTo(this);
         dialog.setLayout(new BorderLayout());
-        
+
         PanelList<StockMovement> list = new PanelList<>(new StockMovement(), filtered);
         dialog.add(list, BorderLayout.CENTER);
         dialog.setVisible(true);

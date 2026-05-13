@@ -4,30 +4,23 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
-/**
- * Gestion de la connexion à la base de données (Singleton).
- * Attributs en lecture seule (get uniquement).
- */
 public class DbConnection {
 
-    // ── Attributs de configuration ────────────────────────────────────────────
-    private final String driver;
-    private final String dbName;
-    private final String username;
-    private final String password;
+    private String driver;
+    private String dbName;
+    private String username;
+    private String password;
 
-    // URL complète construite à partir des attributs
-    private static final String HOST = "localhost";
-    private static final String PORT = "5432";
 
-    // ── Singleton ─────────────────────────────────────────────────────────────
+    private static String HOST = "localhost";
+    private static String PORT = "5432";
+
     private static DbConnection instance;
     private Connection connexion;
 
-    // ── Constructeur privé ────────────────────────────────────────────────────
     private DbConnection() throws Exception {
-        this.driver   = "org.postgresql.Driver";
-        this.dbName   = "inventory";
+        this.driver = "org.postgresql.Driver";
+        this.dbName = "inventory";
         this.username = "postgres";
         this.password = "fanomezantsoa";
 
@@ -38,10 +31,6 @@ public class DbConnection {
     }
 
     // ── Accès Singleton ───────────────────────────────────────────────────────
-    /**
-     * Retourne l'instance unique de DbConnection.
-     * Recrée la connexion si elle est fermée ou nulle.
-     */
     public static DbConnection getInstance() throws Exception {
         if (instance == null || instance.connexion == null || instance.connexion.isClosed()) {
             instance = new DbConnection();
@@ -49,18 +38,13 @@ public class DbConnection {
         return instance;
     }
 
-    // ── Getters (lecture seule) ───────────────────────────────────────────────
-    public String getDriver()   { return driver;   }
-    public String getDbName()   { return dbName;   }
+    public String getDriver() { return driver; }
+    public String getDbName() { return dbName; }
     public String getUsername() { return username; }
     public String getPassword() { return password; }
 
     public Connection getConnexion() { return connexion; }
 
-    // ── Fermeture ─────────────────────────────────────────────────────────────
-    /**
-     * Ferme la connexion et réinitialise le Singleton.
-     */
     public void close() {
         try {
             if (connexion != null && !connexion.isClosed()) {
