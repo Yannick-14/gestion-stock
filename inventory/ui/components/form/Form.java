@@ -2,6 +2,7 @@ package inventory.ui.components.form;
 
 import inventory.ui.components.fields.FieldInput;
 import inventory.ui.components.fields.FieldSelect;
+import inventory.ui.components.fields.FieldDate;
 import inventory.feature.repository.dao.GenericMethodCRUD;
 
 import javax.swing.*;
@@ -92,7 +93,17 @@ public class Form<T> extends JPanel {
             }
         }
         
+        if (isDateType(fieldType)) {
+            return new FieldDate(label);
+        }
+        
         return createInputField(label);
+    }
+
+    private boolean isDateType(Class<?> type) {
+        return type.equals(java.util.Date.class) 
+            || type.equals(java.sql.Date.class) 
+            || type.equals(java.sql.Timestamp.class);
     }
 
     private boolean isCustomObject(Class<?> clazz) {
@@ -142,6 +153,9 @@ public class Form<T> extends JPanel {
             } else if (fieldPanel instanceof FieldSelect) {
                 FieldSelect<?> fieldSelect = (FieldSelect<?>) fieldPanel;
                 value = fieldSelect.getSelectedValue();
+            } else if (fieldPanel instanceof FieldDate) {
+                FieldDate fieldDate = (FieldDate) fieldPanel;
+                value = fieldDate.getText();
             }
 
             // Utiliser la réflexion pour setter le champ avec conversion de type
@@ -248,6 +262,14 @@ public class Form<T> extends JPanel {
             FieldInput input = (FieldInput) panel;
             input.getTextField().getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
                 private void update() { listener.accept(input.getText()); }
+                public void insertUpdate(javax.swing.event.DocumentEvent e) { update(); }
+                public void removeUpdate(javax.swing.event.DocumentEvent e) { update(); }
+                public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }
+            });
+        } else if (panel instanceof FieldDate) {
+            FieldDate fieldDate = (FieldDate) panel;
+            fieldDate.getDatePicker().getTextField().getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                private void update() { listener.accept(fieldDate.getText()); }
                 public void insertUpdate(javax.swing.event.DocumentEvent e) { update(); }
                 public void removeUpdate(javax.swing.event.DocumentEvent e) { update(); }
                 public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }

@@ -26,11 +26,11 @@ public class StockMovement {
 
     public StockMovement(Article article, TypeStockMovement typeStockMovement,
                          int quantity, double unitPrice) {
-        this.article            = article;
-        this.typeStockMovement  = typeStockMovement;
-        this.createdAt          = new Timestamp(System.currentTimeMillis());
-        this.quantity           = quantity;
-        this.unitPrice          = unitPrice;
+        this.article = article;
+        this.typeStockMovement = typeStockMovement;
+        this.createdAt = new Timestamp(System.currentTimeMillis());
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
     }
 
     public int getId() { return id; }

@@ -45,7 +45,7 @@ public class FieldInput extends JPanel {
         ));
 
         add(textField);
-        
+
         // Marge sous le champ
         setBorder(BorderFactory.createEmptyBorder(0, 0, 12, 0));
     }

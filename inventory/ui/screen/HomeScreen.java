@@ -5,9 +5,15 @@ import inventory.feature.stock.StockManager;
 import inventory.models.Article;
 import inventory.models.StockMovement;
 import inventory.ui.components.button.Button;
+import inventory.ui.components.fields.FieldDate;
 import inventory.ui.components.table.CustomColumn;
 import inventory.ui.components.table.PanelList;
 import inventory.ui.components.table.TableFilter;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+// import java.time.format.DateTimeFormatter;
 
 import javax.swing.*;
 import java.awt.*;
@@ -26,6 +32,7 @@ public class HomeScreen extends JPanel {
     private PanelList<Article> articlesList;
     private PanelList<StockMovement> movementsList;
     private List<StockMovement> allMovements;
+    private FieldDate globalDateFilter;
 
     public HomeScreen() {
         setLayout(new BorderLayout());
@@ -43,10 +50,45 @@ public class HomeScreen extends JPanel {
         split.setBorder(BorderFactory.createEmptyBorder(8, 16, 16, 16));
         split.setOpaque(false);
 
+        // Initialiser le filtre avant de charger les panels pour qu'il soit pris en compte
+        buildHeader();
+
         split.setTopComponent(buildArticlesPanel());
         split.setBottomComponent(buildMovementsPanel());
 
-        add(split, BorderLayout.CENTER);
+        JPanel mainContent = new JPanel(new BorderLayout());
+        mainContent.setOpaque(false);
+        mainContent.add(headerContainer, BorderLayout.NORTH);
+        mainContent.add(split, BorderLayout.CENTER);
+
+        add(mainContent, BorderLayout.CENTER);
+    }
+
+    private JPanel headerContainer;
+    private void buildHeader() {
+        headerContainer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 20, 0));
+        headerContainer.setOpaque(false);
+        headerContainer.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 20));
+
+        globalDateFilter = new FieldDate("Filtrer par date (jusqu'au)");
+        globalDateFilter.getDatePicker().setPreferredSize(new Dimension(200, 32));
+        
+        // Listener pour rechargement automatique
+        globalDateFilter.getDatePicker().getTextField().getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { refreshAllData(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { refreshAllData(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { refreshAllData(); }
+        });
+
+        headerContainer.add(globalDateFilter);
+    }
+
+    private void refreshAllData() {
+        this.allMovements = loadMovements();
+        List<Article> articles = loadArticles();
+        
+        if (articlesList != null) articlesList.setData(articles);
+        if (movementsList != null) movementsList.setData(allMovements);
     }
 
     private JPanel buildArticlesPanel() {
@@ -106,7 +148,20 @@ public class HomeScreen extends JPanel {
 
     private List<Article> loadArticles() {
         try {
-            return crud.findAllData(new Article());
+            List<Article> list = crud.findAllData(new Article());
+            
+            // Filtre par date
+            if (globalDateFilter != null) {
+                String dateStr = globalDateFilter.getText();
+                if (dateStr != null && !dateStr.isEmpty()) {
+                    LocalDate filterDate = LocalDate.parse(dateStr);
+                    Timestamp limit = Timestamp.valueOf(LocalDateTime.of(filterDate, LocalTime.MAX));
+                    return list.stream()
+                        .filter(a -> a.getCreatedAt() == null || a.getCreatedAt().before(limit))
+                        .toList();
+                }
+            }
+            return list;
         } catch (Exception e) {
             return new ArrayList<>();
         }
@@ -114,7 +169,21 @@ public class HomeScreen extends JPanel {
 
     private List<StockMovement> loadMovements() {
         try {
-            return crud.findAllData(new StockMovement());
+            List<StockMovement> list = crud.findAllData(new StockMovement());
+            
+            // Filtre par date
+            if (globalDateFilter != null) {
+                String dateStr = globalDateFilter.getText();
+                if (dateStr != null && !dateStr.isEmpty()) {
+                    LocalDate filterDate = LocalDate.parse(dateStr);
+                    // On prend tout ce qui est avant ou égal à la fin de cette date (23:59:59)
+                    Timestamp limit = Timestamp.valueOf(LocalDateTime.of(filterDate, LocalTime.MAX));
+                    return list.stream()
+                        .filter(m -> m.getCreatedAt() != null && m.getCreatedAt().before(limit))
+                        .toList();
+                }
+            }
+            return list;
         } catch (Exception e) {
             return new ArrayList<>();
         }
