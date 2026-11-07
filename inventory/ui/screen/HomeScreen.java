@@ -71,7 +71,7 @@ public class HomeScreen extends JPanel {
         headerContainer.setOpaque(false);
         headerContainer.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 20));
 
-        globalDateFilter = new FieldDate("Filtrer par date (jusqu'au)");
+        globalDateFilter = new FieldDate("Filtrer par date");
         globalDateFilter.getDatePicker().setPreferredSize(new Dimension(200, 32));
 
         // Listener pour rechargement automatique
@@ -96,16 +96,27 @@ public class HomeScreen extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(0, 6));
         panel.setOpaque(false);
 
+        this.allMovements = loadMovements();
+
+        JPanel articlesHeader = new JPanel(new BorderLayout());
+        articlesHeader.setOpaque(false);
+
         JLabel lbl = new JLabel("Articles");
         lbl.setFont(new Font("Segoe UI", Font.BOLD, 16));
         lbl.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
-        panel.add(lbl, BorderLayout.NORTH);
+
+        JLabel lblTotalValue = new JLabel(String.format("Valeur totale : %.2f Ar", sumStockValueForAllArticle()));
+        lblTotalValue.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblTotalValue.setForeground(new Color(80, 120, 200));
+        lblTotalValue.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 8));
+
+        articlesHeader.add(lbl, BorderLayout.WEST);
+        articlesHeader.add(lblTotalValue, BorderLayout.EAST);
+        panel.add(articlesHeader, BorderLayout.NORTH);
 
         List<TableFilter> filters = List.of(
             new TableFilter("nameArticle", "Nom")
         );
-
-        this.allMovements = loadMovements();
 
         List<CustomColumn<Article>> customColumns = List.of(
             createStockBalanceColumn(),
@@ -114,7 +125,6 @@ public class HomeScreen extends JPanel {
         );
 
         List<Article> articles = loadArticles();
-
         this.articlesList = new PanelList<>(new Article(), articles, filters, customColumns);
         panel.add(articlesList, BorderLayout.CENTER);
         return panel;
@@ -204,6 +214,14 @@ public class HomeScreen extends JPanel {
                 return String.format("%.2f Ar", state.totalValue);
             }
         };
+    }
+
+    private double sumStockValueForAllArticle() {
+        double total = 0;
+        for (Article article : loadArticles()) {
+            total += stockManager.calculateStockState(article, allMovements).totalValue;
+        }
+        return total;
     }
 
     private CustomColumn<Article> createViewMovementsButtonColumn() {
