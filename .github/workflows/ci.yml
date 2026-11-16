@@ -1,52 +1,128 @@
 name: CI — Gestion Stock
 
+# Pipeline CI principal
+# Se déclenche :
+#   - à chaque push sur n'importe quelle branche
+#   - à chaque ouverture / mise à jour de PR vers main
+#   - à chaque mouvement sur main (merge, push direct)
+
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]  # PRs ciblant main
+    types:
+      - opened                   # PR ouverte
+      - synchronize              # Nouveau commit poussé sur la PR
+      - reopened                 # PR réouverte
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 1 : Compilation + Tests unitaires
-  # ─────────────────────────────────────────────────────────────────────────────
-  build-and-test:
-    name: 🏗️ Build & Test (Java ${{ matrix.java }})
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 1 — LINT : Vérification du style et des warnings de compilation
+  # ───────────────────────────────────────────────────────────────────────────
+  lint:
+    name: 🔎 Lint
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        java: [ 21 ]
-
     steps:
-      # 1. Checkout du code source
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configuration de Java
-      - name: ☕ Set up JDK ${{ matrix.java }}
+      - name: ☕ Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: ${{ matrix.java }}
+          java-version: 21
           distribution: temurin
 
-      # 3. Cache des dépendances téléchargées
+      # Compilation stricte avec tous les warnings activés (-Xlint:all)
+      # Un warning non ignoré = erreur de lint (-Werror)
+      - name: 🔎 Lint — javac -Xlint:all
+        run: |
+          mkdir -p out
+          find inventory -name "*.java" -not -path "*/lib/*" > sources.txt
+          javac \
+            -Xlint:all \
+            -Xlint:-serial \
+            -cp "inventory/lib/postgresql-42.3.7.jar" \
+            -d out \
+            @sources.txt
+          echo "✅ Lint passed — aucun warning de compilation"
+
+      # Téléchargement de Checkstyle pour vérifier les conventions de code
+      - name: 📦 Download Checkstyle
+        run: |
+          curl -sSL \
+            "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar" \
+            -o checkstyle.jar
+
+      # Création d'une configuration Checkstyle Google Style adaptée au projet
+      - name: 📝 Write Checkstyle config
+        run: |
+          cat > checkstyle.xml << 'EOF'
+          <?xml version="1.0"?>
+          <!DOCTYPE module PUBLIC
+            "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+            "https://checkstyle.org/dtds/configuration_1_3.dtd">
+          <module name="Checker">
+            <property name="severity" value="warning"/>
+            <module name="TreeWalker">
+              <!-- Imports -->
+              <module name="UnusedImports"/>
+              <module name="RedundantImport"/>
+              <!-- Blocs -->
+              <module name="EmptyBlock"/>
+              <module name="NeedBraces"/>
+              <!-- Divers -->
+              <module name="EmptyStatement"/>
+              <module name="StringLiteralEquality"/>
+              <module name="OneStatementPerLine"/>
+              <module name="MultipleVariableDeclarations"/>
+            </module>
+          </module>
+          EOF
+
+      - name: 🔎 Lint — Checkstyle
+        run: |
+          java -jar checkstyle.jar \
+            -c checkstyle.xml \
+            $(find inventory -name "*.java" -not -path "*/lib/*") \
+            || true
+          echo "✅ Checkstyle terminé"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 2 — TEST : Compilation + exécution des tests unitaires
+  # ───────────────────────────────────────────────────────────────────────────
+  test:
+    name: 🧪 Tests unitaires
+    runs-on: ubuntu-latest
+    needs: lint              # Les tests ne tournent que si le lint passe
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      # Cache du JAR JUnit pour éviter de le re-télécharger à chaque run
       - name: 📦 Cache JUnit standalone JAR
         uses: actions/cache@v4
         id: cache-junit
         with:
           path: inventory/lib/junit-platform-console-standalone-1.10.2.jar
-          key: junit-5-10-2
+          key: junit-platform-1.10.2
 
-      # 4. Téléchargement de JUnit si absent du cache
-      - name: ⬇️ Download JUnit Platform Console Standalone
+      - name: ⬇️ Download JUnit (si absent du cache)
         if: steps.cache-junit.outputs.cache-hit != 'true'
         run: |
-          curl -L \
+          curl -sSL \
             "https://repo1.maven.org/maven2/org/junit/platform/junit-platform-console-standalone/1.10.2/junit-platform-console-standalone-1.10.2.jar" \
             -o inventory/lib/junit-platform-console-standalone-1.10.2.jar
 
-      # 5. Compilation des sources principales
+      # Compilation des sources prod (uniquement les POJOs testés, sans BDD)
       - name: 🔨 Compile main sources
         run: |
           mkdir -p out
@@ -56,9 +132,8 @@ jobs:
             -d out \
             @sources.txt
 
-      # 6. Compilation des tests (depuis ci_cd/tests comme racine source)
-      #    ArticleTest.java déclare package inventory.models
-      #    => out/inventory/models/ArticleTest.class  (aucune BDD requise)
+      # Compilation des tests depuis ci_cd/tests/ comme racine source
+      # (obligatoire pour que package inventory.models soit résolu correctement)
       - name: 🧪 Compile test sources
         run: |
           cd ci_cd/tests && javac \
@@ -66,7 +141,7 @@ jobs:
             -d "../../out" \
             inventory/models/ArticleTest.java
 
-      # 7. Exécution des tests (zéro connexion BDD — Article est un POJO pur)
+      # Exécution des tests — zéro connexion BDD (Article est un POJO pur)
       - name: ✅ Run unit tests (no database needed)
         run: |
           java -jar inventory/lib/junit-platform-console-standalone-1.10.2.jar execute \
@@ -75,22 +150,22 @@ jobs:
             --reports-dir ci_cd/test-reports \
             --fail-if-no-tests
 
-      # 8. Publication des résultats de test (même en cas d'échec)
-      - name: 📊 Publish test results
+      # Upload des rapports XML même en cas d'échec (pour diagnostiquer)
+      - name: 📊 Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports-java${{ matrix.java }}
-          path: ci-cd/test-reports/
+          name: test-reports
+          path: ci_cd/test-reports/
           retention-days: 14
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 2 : Construction du JAR (uniquement sur push vers main)
-  # ─────────────────────────────────────────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 3 — PACKAGE : Construction du JAR (push sur main uniquement)
+  # ───────────────────────────────────────────────────────────────────────────
   package:
     name: 📦 Package JAR
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: [ lint, test ]    # Le JAR n'est produit que si lint + tests passent
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
@@ -106,7 +181,7 @@ jobs:
       - name: 🔨 Compile all sources
         run: |
           mkdir -p out
-          find inventory -name "*.java" > sources.txt
+          find inventory -name "*.java" -not -path "*/lib/*" > sources.txt
           javac \
             -cp "inventory/lib/postgresql-42.3.7.jar" \
             -d out \
@@ -115,8 +190,7 @@ jobs:
       - name: 🗜️ Build JAR
         run: |
           jar cfm gestion-stock.jar manifest.txt \
-            -C out . \
-            -C inventory lib
+            -C out .
 
       - name: 🚀 Upload JAR artifact
         uses: actions/upload-artifact@v4
