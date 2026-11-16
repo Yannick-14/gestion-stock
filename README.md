@@ -33,3 +33,14 @@ java -cp "inventory/dist;inventory/lib/postgresql-42.3.7.jar" inventory.Applicat
 jar cvfm gestion-stock.jar manifest.txt -C inventory/dist .
 java -jar gestion-stock.jar
 ```
+
+
+<!-- README POSTGRES -->
+## connect DB
+```
+\c inventory
+```
+## list tables
+```
+\dt
+```

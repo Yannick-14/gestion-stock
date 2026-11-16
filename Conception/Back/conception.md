@@ -56,12 +56,37 @@
     - ATTRIBUTS:
     .id(INT) , nameType (String)
 
->> classe article <!-- liste de nos produits -->
+>> Classe article <!-- liste de nos produits -->
 
     - ATTRIBUTS:
     .id(INT), nameArticle (String), stockManagementMethod (Object --classe methodManagement), createdAt (DateTime)
 
->> classe stockMovement <!-- liste de nos mouvements de stock -->
+>> Classe stockMovement <!-- liste de nos mouvements de stock -->
 
     - ATTRIBUTS:
     .id(INT), article (Object --classe article),typeStockMovement (Object --classe type), createdAt (DateTime), quantity (number), unitPrice (double)
+
+>> Classe Role
+    -ATTRIBUTS:
+    .id (INT)
+    .nameRole (String)
+
+>> Classe User
+    .id(INT)
+    .name(String)
+    .email(String)
+    .password(String) Hash
+    .createdAt (DateTime)
+
+>> Classe Company
+    .id(INT)
+    .haveCompany (BOOLEAN)
+    .nameCompany(STRING)
+    .owner (Object --classe User)
+    .createdAt (DateTime)
+
+>> Classe GroupsCompany
+    .id(INT)
+    .company (Object --classe Company)
+    .user (Object --classe User)
+    .role (Object --classe Role)
