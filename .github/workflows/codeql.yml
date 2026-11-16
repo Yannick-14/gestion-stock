@@ -36,6 +36,9 @@ jobs:
           java-version: 21
           distribution: temurin
 
+      - name: 🔧 Make mvnw executable
+        run: chmod +x ./mvnw
+
       - name: 🔍 Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
