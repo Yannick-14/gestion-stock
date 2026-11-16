@@ -6,6 +6,8 @@ import inventory.models.Article;
 import inventory.models.StockManagementMethod;
 import inventory.models.StockMovement;
 import inventory.models.TypeStockMovement;
+import inventory.models.Role;
+import inventory.models.Users;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +27,8 @@ public class MigrationMain {
             classes.add(TypeStockMovement.class);
             classes.add(Article.class);
             classes.add(StockMovement.class);
+            classes.add(Users.class);
+            classes.add(Role.class);
 
             GenerateTable migration = new GenerateTable(classes.toArray(new Class<?>[0]));
             migration.migrate();

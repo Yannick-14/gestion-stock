@@ -5,6 +5,7 @@ import inventory.models.Article;
 import inventory.models.StockManagementMethod;
 import inventory.models.StockMovement;
 import inventory.models.TypeStockMovement;
+import inventory.models.Role;
 
 import java.util.List;
 
@@ -45,6 +46,10 @@ public class TestSeedMain {
             // Sorties
             crud.insertData(new StockMovement(art1, typeSortie, 2, 1500.0));
             crud.insertData(new StockMovement(art2, typeSortie, 10, 25.0));
+
+            Role role = new Role("Super Admin");
+            role = crud.insertData(role);
+            System.out.println("  → Roles créés "+ role);
 
             System.out.println("[TestSeedMain] Données de test insérées avec succès.");
 

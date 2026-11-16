@@ -10,12 +10,6 @@ import java.util.List;
 
 import inventory.feature.repository.connection.DbConnection;
 
-/**
- * Classe générique de CRUD.
- * - Le nom de table est déduit automatiquement depuis la classe (camelCase → snake_case).
- * - Les noms de colonnes suivent la même convention.
- * - Une seule connexion par opération, fermée proprement.
- */
 public class GenericMethodCRUD {
 
     // ── Utilitaire: camelCase → snake_case ────────────────────────────────────
@@ -36,7 +30,7 @@ public class GenericMethodCRUD {
      * Déduit le nom de table SQL depuis un objet Java.
      * Ex: new Article() → "article", new StockMovement() → "stock_movement"
      */
-    protected static String tableNomDepuisClasse(Object obj) {
+    protected static String nameTableFromClasseModel(Object obj) {
         return toSnakeCase(obj.getClass().getSimpleName());
     }
 
@@ -46,7 +40,7 @@ public class GenericMethodCRUD {
      */
     @SuppressWarnings("unchecked")
     public <T> List<T> findAllData(T obj) throws Exception {
-        String table = tableNomDepuisClasse(obj);
+        String table = nameTableFromClasseModel(obj);
         Class<T> cls = (Class<T>) obj.getClass();
         String sql = "SELECT * FROM " + table;
         List<T> resultats = new ArrayList<>();
@@ -157,7 +151,7 @@ public class GenericMethodCRUD {
      */
     @SuppressWarnings("unchecked")
     public <T> T read(T obj, int id) throws Exception {
-        String table = tableNomDepuisClasse(obj);
+        String table = nameTableFromClasseModel(obj);
         Class<T> cls = (Class<T>) obj.getClass();
         String sql = "SELECT * FROM " + table + " WHERE id = ?";
 
@@ -192,7 +186,7 @@ public class GenericMethodCRUD {
      */
     @SuppressWarnings("unchecked")
     public <T> List<T> findDataWithRequest(T obj, String whereClause) throws Exception {
-        String table = tableNomDepuisClasse(obj);
+        String table = nameTableFromClasseModel(obj);
         Class<T> cls = (Class<T>) obj.getClass();
         String sql = "SELECT * FROM " + table
                    + (whereClause != null && !whereClause.trim().isEmpty() ? " " + whereClause : "");
@@ -226,7 +220,7 @@ public class GenericMethodCRUD {
      * @return l'objet inséré avec son ID mis à jour
      */
     public <T> T insertData(T obj) throws Exception {
-        String table = tableNomDepuisClasse(obj);
+        String table = nameTableFromClasseModel(obj);
         Field[] champs = obj.getClass().getDeclaredFields();
 
         StringBuilder cols = new StringBuilder();
@@ -303,7 +297,7 @@ public class GenericMethodCRUD {
      * Seuls les champs non-null (hors id) sont inclus dans le SET.
      */
     public void update(Object obj, int id) throws Exception {
-        String table = tableNomDepuisClasse(obj);
+        String table = nameTableFromClasseModel(obj);
         Field[] champs = obj.getClass().getDeclaredFields();
 
         StringBuilder set = new StringBuilder();
@@ -353,7 +347,7 @@ public class GenericMethodCRUD {
      * Supprime une ligne par son id.
      */
     public void delete(Object obj, int id) throws Exception {
-        String table = tableNomDepuisClasse(obj);
+        String table = nameTableFromClasseModel(obj);
         String sql = "DELETE FROM " + table + " WHERE id = ?";
 
         try (Connection conn = DbConnection.getInstance().getConnexion();

@@ -8,7 +8,7 @@ public class Batch {
     // Constructeur par défaut
     public Batch() {
     }
-    
+
     // Constructeur avec paramètres
     public Batch(int quantity, double price) {
         this.quantity = quantity;
