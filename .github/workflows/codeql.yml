@@ -1,11 +1,5 @@
 name: "CodeQL — Security Analysis"
 
-# Analyse de sécurité CodeQL
-# Se déclenche :
-#   - à chaque ouverture / mise à jour de PR vers main
-#   - à chaque push sur main
-#   - toutes les semaines (dimanche 01h45) pour détecter les nouvelles CVE
-
 on:
   push:
     branches: [ "main" ]
@@ -20,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
+      security-events: write
       packages: read
       actions: read
       contents: read
@@ -46,19 +41,11 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          # Activer les requêtes de sécurité étendues
           queries: security-extended
 
-      # Build manuel nécessaire pour java-kotlin en mode manual
       - name: 🔨 Build for CodeQL
         if: matrix.build-mode == 'manual'
-        run: |
-          mkdir -p out
-          find inventory -name "*.java" -not -path "*/lib/*" > sources.txt
-          javac \
-            -cp "inventory/lib/postgresql-42.3.7.jar" \
-            -d out \
-            @sources.txt
+        run: ./mvnw compile -q
 
       - name: 🔐 Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

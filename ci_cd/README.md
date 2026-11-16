@@ -13,74 +13,81 @@ ci_cd/
 ├── test-reports/               # Rapports XML générés (non versionnés)
 └── README.md
 
-inventory/lib/
-├── postgresql-42.3.7.jar
-└── junit-platform-console-standalone-1.10.2.jar
-
 .github/
 └── workflows/
-    └── ci.yml
+    ├── ci.yml                  # Pipeline CI principal (lint, test, package)
+    └── codeql.yml              # Analyse de sécurité CodeQL
+
+pom.xml                         # Configuration Maven
+mvnw / mvnw.cmd                 # Maven Wrapper (pas besoin d'installer Maven)
 ```
 
 ---
 
-## 🚀 Pipeline GitHub Actions
+## 🚀 Pipelines GitHub Actions
 
-| Workflow | Déclencheur | Description |
-|----------|-------------|-------------|
-| `ci.yml` | Push / PR sur `main` & `develop` | Compile, teste, construit le JAR |
+| Workflow | Déclencheur | Jobs |
+|----------|-------------|------|
+| `ci.yml` | Push (toutes branches) / PR vers `main`, `develop` | Lint → Test → Package JAR |
+| `codeql.yml` | Push / PR vers `main` + hebdomadaire | Analyse de sécurité |
 
 ---
 
 ## ▶️ Lancer les tests en local
 
-> **Pré-requis** : Java 21+ (`java -version` pour vérifier).
-> Les tests de modèles ne nécessitent **aucune connexion à la base de données**.
-
-Toutes les commandes sont à lancer depuis la **racine du projet**.
-
----
-
-### 🪟 Windows — PowerShell
+> **Pré-requis** : Java 21+ uniquement. Maven n'est **pas nécessaire** grâce au wrapper (`mvnw`).
+> Les tests ne nécessitent **aucune base de données** — Article est un POJO pur.
 
 **Lancer tous les tests :**
 
 ```powershell
-New-Item -ItemType Directory -Force -Path out | Out-Null; javac -cp "inventory\lib\postgresql-42.3.7.jar" -d out inventory\models\Article.java inventory\models\StockManagementMethod.java inventory\feature\annotation\FormIgnore.java; Set-Location ci_cd\tests; javac -cp "..\..\out;..\..\inventory\lib\junit-platform-console-standalone-1.10.2.jar" -d "..\..\out" inventory\models\ArticleTest.java; Set-Location ..\.. ; java -jar inventory\lib\junit-platform-console-standalone-1.10.2.jar execute --class-path "out" --select-class inventory.models.ArticleTest --reports-dir ci_cd\test-reports --fail-if-no-tests
+.\mvnw.cmd test
+```
+
+```bash
+./mvnw test
 ```
 
 **Lancer un seul test :**
 
 ```powershell
-java -jar inventory\lib\junit-platform-console-standalone-1.10.2.jar execute --class-path "out" --select-method "inventory.models.ArticleTest#testDefaultConstructor" --fail-if-no-tests
+.\mvnw.cmd test -Dtest="ArticleTest#testDefaultConstructor"
 ```
 
-**Nettoyer les fichiers compilés :**
+```bash
+./mvnw test -Dtest="ArticleTest#testDefaultConstructor"
+```
+
+**Compiler sans tester :**
 
 ```powershell
-Remove-Item -Recurse -Force out
+.\mvnw.cmd compile
 ```
 
----
-
-### 🐧 Linux / macOS — bash
-
-**Lancer tous les tests :**
-
 ```bash
-mkdir -p out && javac -cp "inventory/lib/postgresql-42.3.7.jar" -d out inventory/models/Article.java inventory/models/StockManagementMethod.java inventory/feature/annotation/FormIgnore.java && cd ci_cd/tests && javac -cp "../../out:../../inventory/lib/junit-platform-console-standalone-1.10.2.jar" -d "../../out" inventory/models/ArticleTest.java && cd ../.. && java -jar inventory/lib/junit-platform-console-standalone-1.10.2.jar execute --class-path "out" --select-class inventory.models.ArticleTest --reports-dir ci_cd/test-reports --fail-if-no-tests
+./mvnw compile
 ```
 
-**Lancer un seul test :**
+**Construire le JAR :**
 
-```bash
-java -jar inventory/lib/junit-platform-console-standalone-1.10.2.jar execute --class-path "out" --select-method "inventory.models.ArticleTest#testDefaultConstructor" --fail-if-no-tests
+```powershell
+.\mvnw.cmd package
 ```
 
-**Nettoyer les fichiers compilés :**
+```bash
+./mvnw package
+```
+
+Le JAR est généré dans `target/gestion-stock-1.0.0.jar`.
+
+**Nettoyer :**
+
+```powershell
+.\mvnw.cmd clean
+```
 
 ```bash
-rm -rf out
+./mvnw clean
 ```
 
 ---
@@ -104,16 +111,3 @@ rm -rf out
 | Indépendance entre deux articles | `testArticlesAreIndependent` |
 | Accepte un nom vide | `testSetEmptyNameArticle` |
 | Accepte méthode `null` (désassociation) | `testSetNullStockManagementMethod` |
-
----
-
-## 📄 À quoi servent les `test-reports/` ?
-
-| Fichier | Rôle |
-|---------|------|
-| `TEST-junit-jupiter.xml` | ⭐ Rapport principal — résultat de chaque test (nom, durée, succès/échec) |
-| `TEST-junit-vintage.xml` | Rapport vide — moteur JUnit 4 (non utilisé ici) |
-| `TEST-junit-platform-suite.xml` | Rapport vide — moteur suites (non utilisé ici) |
-
-Ces fichiers sont ignorés par Git et se regénèrent à chaque run.
-Sur GitHub Actions, ils sont uploadés en artifact et affichés dans le résumé de la PR.

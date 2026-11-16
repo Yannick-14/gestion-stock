@@ -1,24 +1,15 @@
 name: CI — Gestion Stock
 
-# Pipeline CI principal
-# Se déclenche :
-#   - à chaque push sur n'importe quelle branche
-#   - à chaque ouverture / mise à jour de PR vers main
-#   - à chaque mouvement sur main (merge, push direct)
-
 on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]  # PRs ciblant main
-    types:
-      - opened                   # PR ouverte
-      - synchronize              # Nouveau commit poussé sur la PR
-      - reopened                 # PR réouverte
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
 
 jobs:
   # ───────────────────────────────────────────────────────────────────────────
-  # JOB 1 — LINT : Vérification du style et des warnings de compilation
+  # JOB 1 — LINT : Compilation stricte avec warnings
   # ───────────────────────────────────────────────────────────────────────────
   lint:
     name: 🔎 Lint
@@ -34,68 +25,16 @@ jobs:
           java-version: 21
           distribution: temurin
 
-      # Compilation stricte avec tous les warnings activés (-Xlint:all)
-      # Un warning non ignoré = erreur de lint (-Werror)
-      - name: 🔎 Lint — javac -Xlint:all
-        run: |
-          mkdir -p out
-          find inventory -name "*.java" -not -path "*/lib/*" > sources.txt
-          javac \
-            -Xlint:all \
-            -Xlint:-serial \
-            -cp "inventory/lib/postgresql-42.3.7.jar" \
-            -d out \
-            @sources.txt
-          echo "✅ Lint passed — aucun warning de compilation"
-
-      # Téléchargement de Checkstyle pour vérifier les conventions de code
-      - name: 📦 Download Checkstyle
-        run: |
-          curl -sSL \
-            "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar" \
-            -o checkstyle.jar
-
-      # Création d'une configuration Checkstyle Google Style adaptée au projet
-      - name: 📝 Write Checkstyle config
-        run: |
-          cat > checkstyle.xml << 'EOF'
-          <?xml version="1.0"?>
-          <!DOCTYPE module PUBLIC
-            "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
-            "https://checkstyle.org/dtds/configuration_1_3.dtd">
-          <module name="Checker">
-            <property name="severity" value="warning"/>
-            <module name="TreeWalker">
-              <!-- Imports -->
-              <module name="UnusedImports"/>
-              <module name="RedundantImport"/>
-              <!-- Blocs -->
-              <module name="EmptyBlock"/>
-              <module name="NeedBraces"/>
-              <!-- Divers -->
-              <module name="EmptyStatement"/>
-              <module name="StringLiteralEquality"/>
-              <module name="OneStatementPerLine"/>
-              <module name="MultipleVariableDeclarations"/>
-            </module>
-          </module>
-          EOF
-
-      - name: 🔎 Lint — Checkstyle
-        run: |
-          java -jar checkstyle.jar \
-            -c checkstyle.xml \
-            $(find inventory -name "*.java" -not -path "*/lib/*") \
-            || true
-          echo "✅ Checkstyle terminé"
+      - name: 🔎 Compile avec warnings (-Xlint)
+        run: ./mvnw compile -Dmaven.compiler.showWarnings=true -Dmaven.compiler.compilerArgument=-Xlint:all
 
   # ───────────────────────────────────────────────────────────────────────────
-  # JOB 2 — TEST : Compilation + exécution des tests unitaires
+  # JOB 2 — TEST : Tests unitaires (aucune BDD requise)
   # ───────────────────────────────────────────────────────────────────────────
   test:
     name: 🧪 Tests unitaires
     runs-on: ubuntu-latest
-    needs: lint              # Les tests ne tournent que si le lint passe
+    needs: lint
 
     steps:
       - name: 📥 Checkout repository
@@ -107,50 +46,16 @@ jobs:
           java-version: 21
           distribution: temurin
 
-      # Cache du JAR JUnit pour éviter de le re-télécharger à chaque run
-      - name: 📦 Cache JUnit standalone JAR
+      - name: 📦 Cache Maven
         uses: actions/cache@v4
-        id: cache-junit
         with:
-          path: inventory/lib/junit-platform-console-standalone-1.10.2.jar
-          key: junit-platform-1.10.2
+          path: ~/.m2/repository
+          key: maven-${{ hashFiles('pom.xml') }}
+          restore-keys: maven-
 
-      - name: ⬇️ Download JUnit (si absent du cache)
-        if: steps.cache-junit.outputs.cache-hit != 'true'
-        run: |
-          curl -sSL \
-            "https://repo1.maven.org/maven2/org/junit/platform/junit-platform-console-standalone/1.10.2/junit-platform-console-standalone-1.10.2.jar" \
-            -o inventory/lib/junit-platform-console-standalone-1.10.2.jar
+      - name: ✅ Run tests
+        run: ./mvnw test
 
-      # Compilation des sources prod (uniquement les POJOs testés, sans BDD)
-      - name: 🔨 Compile main sources
-        run: |
-          mkdir -p out
-          find inventory -name "*.java" -not -path "*/lib/*" > sources.txt
-          javac \
-            -cp "inventory/lib/postgresql-42.3.7.jar" \
-            -d out \
-            @sources.txt
-
-      # Compilation des tests depuis ci_cd/tests/ comme racine source
-      # (obligatoire pour que package inventory.models soit résolu correctement)
-      - name: 🧪 Compile test sources
-        run: |
-          cd ci_cd/tests && javac \
-            -cp "../../out:../../inventory/lib/junit-platform-console-standalone-1.10.2.jar" \
-            -d "../../out" \
-            inventory/models/ArticleTest.java
-
-      # Exécution des tests — zéro connexion BDD (Article est un POJO pur)
-      - name: ✅ Run unit tests (no database needed)
-        run: |
-          java -jar inventory/lib/junit-platform-console-standalone-1.10.2.jar execute \
-            --class-path "out" \
-            --select-class inventory.models.ArticleTest \
-            --reports-dir ci_cd/test-reports \
-            --fail-if-no-tests
-
-      # Upload des rapports XML même en cas d'échec (pour diagnostiquer)
       - name: 📊 Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -160,12 +65,12 @@ jobs:
           retention-days: 14
 
   # ───────────────────────────────────────────────────────────────────────────
-  # JOB 3 — PACKAGE : Construction du JAR (push sur main uniquement)
+  # JOB 3 — PACKAGE : Build du JAR (push sur main uniquement)
   # ───────────────────────────────────────────────────────────────────────────
   package:
     name: 📦 Package JAR
     runs-on: ubuntu-latest
-    needs: [ lint, test ]    # Le JAR n'est produit que si lint + tests passent
+    needs: [ lint, test ]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
@@ -178,23 +83,19 @@ jobs:
           java-version: 21
           distribution: temurin
 
-      - name: 🔨 Compile all sources
-        run: |
-          mkdir -p out
-          find inventory -name "*.java" -not -path "*/lib/*" > sources.txt
-          javac \
-            -cp "inventory/lib/postgresql-42.3.7.jar" \
-            -d out \
-            @sources.txt
+      - name: 📦 Cache Maven
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ hashFiles('pom.xml') }}
+          restore-keys: maven-
 
       - name: 🗜️ Build JAR
-        run: |
-          jar cfm gestion-stock.jar manifest.txt \
-            -C out .
+        run: ./mvnw package -DskipTests
 
       - name: 🚀 Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: gestion-stock-jar
-          path: gestion-stock.jar
+          path: target/gestion-stock-1.0.0.jar
           retention-days: 30

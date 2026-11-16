@@ -1,4 +1,6 @@
 .vscode
 out
 dist
+target/
+ci_cd/test-reports/
 sources.txt
