@@ -5,10 +5,6 @@ import inventory.ui.Window;
 
 import javax.swing.*;
 
-/**
- * Point d'entrée de l'application.
- * Lance la fenêtre principale avec la Navigation (sidebar + contenu).
- */
 public class Application {
 
     public static void main(String[] args) {
