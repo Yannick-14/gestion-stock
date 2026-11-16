@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="JUnit Jupiter" tests="13" skipped="0" failures="0" errors="0" time="0.165" hostname="DESKTOP-LQ88RV1" timestamp="2026-11-16T10:28:07">
+<properties>
+<property name="file.encoding" value="UTF-8"/>
+<property name="file.separator" value="\"/>
+<property name="java.class.path" value="inventory/lib/junit-platform-console-standalone-1.10.2.jar"/>
+<property name="java.class.version" value="65.0"/>
+<property name="java.home" value="C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot"/>
+<property name="java.io.tmpdir" value="C:\Users\fanom\AppData\Local\Temp\"/>
+<property name="java.library.path" value="C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\bin;C:\WINDOWS\Sun\Java\bin;C:\WINDOWS\system32;C:\WINDOWS;C:/Users/fanom/.gemini/antigravity/bin;C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\bin;C:\Program Files\Eclipse Adoptium\jre-21.0.11.10-hotspot\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files\Git\cmd;%NVM_HOME%;%NVM_SYMLINK%;C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\dotnet\;C:\Program Files\GitHub CLI\;C:\Users\fanom\AppData\Local\Microsoft\WindowsApps;C:\Users\fanom\AppData\Local\Programs\Antigravity IDE\bin;C:\Users\fanom\AppData\Local\nvm;C:\nvm4w\nodejs;C:\Users\fanom\AppData\Local\GitHubDesktop\bin;C:\Users\fanom\.dotnet\tools;C:\Users\fanom\AppData\Local\Microsoft\WinGet\Packages\infisical.infisical_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\Users\fanom\AppData\Local\Programs\Ollama;C:\Users\fanom\AppData\Local\Kingsoft\WPS Office\12.1.0.27458\clitool;C:\Users\fanom\.local\bin;C:\Users\fanom\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\fanom\AppData\Local\Programs\Microsoft VS Code\bin\copilot-shim;."/>
+<property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+<property name="java.runtime.version" value="21.0.11+10-LTS"/>
+<property name="java.specification.name" value="Java Platform API Specification"/>
+<property name="java.specification.vendor" value="Oracle Corporation"/>
+<property name="java.specification.version" value="21"/>
+<property name="java.vendor" value="Eclipse Adoptium"/>
+<property name="java.vendor.url" value="https://adoptium.net/"/>
+<property name="java.vendor.url.bug" value="https://github.com/adoptium/adoptium-support/issues"/>
+<property name="java.vendor.version" value="Temurin-21.0.11+10"/>
+<property name="java.version" value="21.0.11"/>
+<property name="java.version.date" value="2026-04-21"/>
+<property name="java.vm.compressedOopsMode" value="Zero based"/>
+<property name="java.vm.info" value="mixed mode, sharing"/>
+<property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+<property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+<property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+<property name="java.vm.specification.version" value="21"/>
+<property name="java.vm.vendor" value="Eclipse Adoptium"/>
+<property name="java.vm.version" value="21.0.11+10-LTS"/>
+<property name="jdk.debug" value="release"/>
+<property name="line.separator" value="
+"/>
+<property name="native.encoding" value="Cp1252"/>
+<property name="os.arch" value="amd64"/>
+<property name="os.name" value="Windows 11"/>
+<property name="os.version" value="10.0"/>
+<property name="path.separator" value=";"/>
+<property name="stderr.encoding" value="Cp1252"/>
+<property name="stdout.encoding" value="Cp1252"/>
+<property name="sun.arch.data.model" value="64"/>
+<property name="sun.boot.library.path" value="C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\bin"/>
+<property name="sun.cpu.endian" value="little"/>
+<property name="sun.cpu.isalist" value="amd64"/>
+<property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+<property name="sun.java.command" value="inventory/lib/junit-platform-console-standalone-1.10.2.jar execute --class-path out_prod --select-class inventory.models.ArticleTest --reports-dir ci_cd/test-reports --fail-if-no-tests"/>
+<property name="sun.java.launcher" value="SUN_STANDARD"/>
+<property name="sun.jnu.encoding" value="Cp1252"/>
+<property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+<property name="sun.os.patch.level" value=""/>
+<property name="user.country" value="FR"/>
+<property name="user.dir" value="D:\Project\Gestion-stock"/>
+<property name="user.home" value="C:\Users\fanom"/>
+<property name="user.language" value="fr"/>
+<property name="user.name" value="Yannick Fano"/>
+<property name="user.script" value=""/>
+<property name="user.timezone" value="Africa/Nairobi"/>
+<property name="user.variant" value=""/>
+</properties>
+<testcase name="testToStringWhenNameIsNull()" classname="inventory.models.ArticleTest" time="0.001">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testToStringWhenNameIsNull()]
+display-name: toString : retourne null si nameArticle n'est pas défini
+]]></system-out>
+</testcase>
+<testcase name="testChangeStockManagementMethod()" classname="inventory.models.ArticleTest" time="0">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testChangeStockManagementMethod()]
+display-name: Un article peut changer de méthode de gestion de stock
+]]></system-out>
+</testcase>
+<testcase name="testSetGetId()" classname="inventory.models.ArticleTest" time="0.005">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testSetGetId()]
+display-name: setId / getId : lecture-écriture de l'identifiant
+]]></system-out>
+</testcase>
+<testcase name="testSetGetCreatedAt()" classname="inventory.models.ArticleTest" time="0.001">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testSetGetCreatedAt()]
+display-name: setCreatedAt / getCreatedAt : lecture-écriture du timestamp
+]]></system-out>
+</testcase>
+<testcase name="testSetEmptyNameArticle()" classname="inventory.models.ArticleTest" time="0.001">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testSetEmptyNameArticle()]
+display-name: setNameArticle accepte un nom vide (validation à faire au niveau service)
+]]></system-out>
+</testcase>
+<testcase name="testArticlesAreIndependent()" classname="inventory.models.ArticleTest" time="0.003">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testArticlesAreIndependent()]
+display-name: Deux articles avec le même nom sont indépendants (pas de référence partagée)
+]]></system-out>
+</testcase>
+<testcase name="testParameterizedConstructorSetsCreatedAt()" classname="inventory.models.ArticleTest" time="0.003">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testParameterizedConstructorSetsCreatedAt()]
+display-name: Constructeur paramétré : createdAt est initialisé automatiquement
+]]></system-out>
+</testcase>
+<testcase name="testSetGetNameArticle()" classname="inventory.models.ArticleTest" time="0.009">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testSetGetNameArticle()]
+display-name: setNameArticle / getNameArticle : lecture-écriture du nom
+]]></system-out>
+</testcase>
+<testcase name="testSetGetStockManagementMethod()" classname="inventory.models.ArticleTest" time="0.046">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testSetGetStockManagementMethod()]
+display-name: setStockManagementMethod / getStockManagementMethod : lecture-écriture de la méthode
+]]></system-out>
+</testcase>
+<testcase name="testParameterizedConstructor()" classname="inventory.models.ArticleTest" time="0.001">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testParameterizedConstructor()]
+display-name: Constructeur paramétré : initialise nameArticle et stockManagementMethod
+]]></system-out>
+</testcase>
+<testcase name="testToString()" classname="inventory.models.ArticleTest" time="0">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testToString()]
+display-name: toString : retourne le nom de l'article
+]]></system-out>
+</testcase>
+<testcase name="testSetNullStockManagementMethod()" classname="inventory.models.ArticleTest" time="0.001">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testSetNullStockManagementMethod()]
+display-name: setStockManagementMethod accepte null (cas désassociation)
+]]></system-out>
+</testcase>
+<testcase name="testDefaultConstructor()" classname="inventory.models.ArticleTest" time="0.001">
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]/[class:inventory.models.ArticleTest]/[method:testDefaultConstructor()]
+display-name: Constructeur vide : valeurs par défaut
+]]></system-out>
+</testcase>
+<system-out><![CDATA[
+unique-id: [engine:junit-jupiter]
+display-name: JUnit Jupiter
+]]></system-out>
+</testsuite>

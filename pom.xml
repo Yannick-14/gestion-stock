@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.gestionstock</groupId>
+    <artifactId>gestion-stock</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>Gestion de Stock</name>
+    <description>Application de gestion de stock avec interface Swing</description>
+
+    <!-- ───────────────────────────────────────────────────────────────────── -->
+    <!-- Propriétés                                                          -->
+    <!-- ───────────────────────────────────────────────────────────────────── -->
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <junit.version>5.10.2</junit.version>
+        <postgresql.version>42.3.7</postgresql.version>
+    </properties>
+
+    <!-- ───────────────────────────────────────────────────────────────────── -->
+    <!-- Dépendances (remplacent les JARs manuels dans inventory/lib/)       -->
+    <!-- ───────────────────────────────────────────────────────────────────── -->
+    <dependencies>
+        <!-- PostgreSQL JDBC driver -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
+        </dependency>
+
+        <!-- JUnit 5 — scope test (uniquement pour les tests, pas dans le JAR) -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- ───────────────────────────────────────────────────────────────────── -->
+    <!-- Build — Adapté à la structure de dossiers existante                 -->
+    <!--   Sources :  inventory/  (package inventory.*)                      -->
+    <!--   Tests   :  ci_cd/tests/ (package inventory.models)               -->
+    <!-- ───────────────────────────────────────────────────────────────────── -->
+    <build>
+        <!-- Les sources prod sont à la racine du projet (package inventory.*) -->
+        <sourceDirectory>${project.basedir}</sourceDirectory>
+
+        <!-- Les tests sont dans ci_cd/tests/ -->
+        <testSourceDirectory>${project.basedir}/ci_cd/tests</testSourceDirectory>
+
+        <plugins>
+            <!-- Compilateur Java -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <source>21</source>
+                    <target>21</target>
+                    <!-- Ne compiler que les .java sous inventory/ -->
+                    <includes>
+                        <include>inventory/**/*.java</include>
+                    </includes>
+                    <excludes>
+                        <exclude>inventory/lib/**</exclude>
+                        <exclude>inventory/dist/**</exclude>
+                    </excludes>
+                    <!-- Tests : .java sous ci_cd/tests/inventory/ -->
+                    <testIncludes>
+                        <testInclude>inventory/**/*.java</testInclude>
+                    </testIncludes>
+                </configuration>
+            </plugin>
+
+            <!-- Exécution des tests avec Surefire (JUnit 5) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                    </includes>
+                    <!-- Rapports XML dans ci_cd/test-reports/ -->
+                    <reportsDirectory>${project.basedir}/ci_cd/test-reports</reportsDirectory>
+                </configuration>
+            </plugin>
+
+            <!-- Construction du JAR exécutable -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>inventory.Application</mainClass>
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix>lib/</classpathPrefix>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+
+            <!-- Copier les dépendances dans target/lib/ pour le JAR -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                            <includeScope>runtime</includeScope>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
