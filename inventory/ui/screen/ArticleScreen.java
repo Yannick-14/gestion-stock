@@ -14,12 +14,9 @@ import inventory.models.Article;
  * Le formulaire est entièrement automatique grâce à la classe Form.
  */
 public class ArticleScreen extends AbstractFormScreen<Article> {
-
-    // private final GenericMethodCRUD crud = new GenericMethodCRUD();
-
     public ArticleScreen() {
         super("Insertion d'article", new Article());
-        
+
         // Ajouter des actions supplémentaires si nécessaire
         // Exemple : un bouton "Retour" avant les boutons par défaut
         // setActions(java.util.List.of(

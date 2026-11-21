@@ -2,6 +2,7 @@ package inventory.ui;
 
 import inventory.ui.screen.ArticleScreen;
 import inventory.ui.screen.HomeScreen;
+import inventory.ui.screen.LoginScreen;
 import inventory.ui.screen.StockMovementScreen;
 import inventory.ui.components.button.Button;
 
@@ -88,6 +89,17 @@ public class Navigation extends JPanel {
         sidebar.add(btnMouvement);
         sidebar.add(Box.createVerticalGlue());
 
+        sidebar.add(Box.createVerticalGlue());
+
+        // Bouton Connexion / Déconnexion
+        Button btnAuth = createNavSignupLogin("Connexion");
+
+        btnAuth.addActionListener(e -> {
+            showScreen(new LoginScreen());
+        });
+
+        sidebar.add(btnAuth);
+
         // Activer le premier bouton par défaut
         setActive(btnHome);
 
@@ -103,6 +115,20 @@ public class Navigation extends JPanel {
         btn.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         btn.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 10));
         btn.setBackground(new Color(30, 40, 65));
+        return btn;
+    }
+
+    private Button createNavSignupLogin(String text) {
+        Button btn = new Button(text, Button.Style.SECONDARY);
+
+        btn.setMaximumSize(new Dimension(220, 44));
+        btn.setPreferredSize(new Dimension(220, 44));
+        btn.setAlignmentX(Component.LEFT_ALIGNMENT);
+        btn.setHorizontalAlignment(SwingConstants.LEFT);
+        btn.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        btn.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 10));
+        btn.setBackground(new Color(45, 60, 90));
+
         return btn;
     }
 

@@ -15,7 +15,7 @@ public class TypeStockMovement {
     public TypeStockMovement() {}
 
     public TypeStockMovement(String nameType) {
-        this.nameType = nameType;
+        this.setNameType(nameType);
     }
 
     public int getId() { return id; }
@@ -26,6 +26,6 @@ public class TypeStockMovement {
 
     @Override
     public String toString() {
-        return nameType;
+        return this.getNameType();
     }
 }
