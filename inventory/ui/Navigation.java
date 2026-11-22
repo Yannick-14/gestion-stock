@@ -44,6 +44,34 @@ public class Navigation extends JPanel {
         showScreen(new HomeScreen());
     }
 
+    private void openLoginScreen() {
+        if (activeButton != null) {
+            activeButton.setBackground(new Color(30, 40, 65));
+            activeButton = null;
+        }
+
+        LoginScreen loginScreen = new LoginScreen();
+
+        loginScreen.setOnAuthResult(result -> {
+            JOptionPane.showMessageDialog(
+                this,
+                result.getMessage(),
+                result.isSuccess() ? "Succès" : "Erreur",
+                result.isSuccess() ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE
+            );
+
+            if (result.isRedirect()) {
+                showScreen(new HomeScreen());
+            }
+        });
+
+        JPanel wrapper = new JPanel(new GridBagLayout());
+        wrapper.setOpaque(false);
+        wrapper.add(loginScreen);
+
+        showScreen(wrapper);
+    }
+
     // ── Construction de la sidebar ────────────────────────────────────────────
 
     private JPanel buildSidebar() {
@@ -94,9 +122,7 @@ public class Navigation extends JPanel {
         // Bouton Connexion / Déconnexion
         Button btnAuth = createNavSignupLogin("Connexion");
 
-        btnAuth.addActionListener(e -> {
-            showScreen(new LoginScreen());
-        });
+        btnAuth.addActionListener(e -> openLoginScreen());
 
         sidebar.add(btnAuth);
 

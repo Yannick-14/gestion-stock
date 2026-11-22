@@ -100,7 +100,8 @@ public class Form<T> extends JPanel {
         }
 
         // Types primitifs et String
-        return new FieldInput(label);
+        boolean isPasswordField = field.getName().toLowerCase().contains("password");
+        return new FieldInput(label, isPasswordField);
     }
 
     private boolean isEnumType(Class<?> type) {

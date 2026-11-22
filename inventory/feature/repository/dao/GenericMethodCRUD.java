@@ -72,7 +72,7 @@ public class GenericMethodCRUD {
                         } catch (Exception e) {
                             // Pas de colonne FK correspondante
                         }
-                        
+
                         if (fkValue != null && !isPrimitiveOrWrapper(champ.getType()) 
                             && !champ.getType().equals(String.class)
                             && !java.util.Date.class.isAssignableFrom(champ.getType())
@@ -100,7 +100,7 @@ public class GenericMethodCRUD {
                 resultats.add(instance);
             }
         }
-        System.out.println("[CRUD] findAllData → " + resultats.size() + " ligne(s) dans " + table);
+        // System.out.println("[CRUD] findAllData → " + resultats.size() + " ligne(s) dans " + table);
         return resultats;
     }
 
@@ -140,13 +140,13 @@ public class GenericMethodCRUD {
                         }
                     }
                     
-                    System.out.println("[CRUD] FK chargée: " + relatedClass.getSimpleName() + "(id=" + id + ") -> " + relatedInstance);
+                    // System.out.println("[CRUD] FK chargée: " + relatedClass.getSimpleName() + "(id=" + id + ") -> " + relatedInstance);
                     return relatedInstance;
                 }
             }
         }
         
-        System.out.println("[CRUD] FK non trouvée: " + relatedClass.getSimpleName() + "(id=" + id + ")");
+        // System.out.println("[CRUD] FK non trouvée: " + relatedClass.getSimpleName() + "(id=" + id + ")");
         return null;
     }
 
@@ -175,12 +175,12 @@ public class GenericMethodCRUD {
                             champ.set(instance, rs.getObject(col));
                         } catch (Exception ignored) {}
                     }
-                    System.out.println("[CRUD] read → id=" + id + " trouvé dans " + table);
+                    // System.out.println("[CRUD] read → id=" + id + " trouvé dans " + table);
                     return instance;
                 }
             }
         }
-        System.out.println("[CRUD] read → id=" + id + " non trouvé dans " + table);
+        // System.out.println("[CRUD] read → id=" + id + " non trouvé dans " + table);
         return null;
     }
 
@@ -215,7 +215,7 @@ public class GenericMethodCRUD {
                 resultats.add(instance);
             }
         }
-        System.out.println("[CRUD] findDataWithRequest → " + resultats.size() + " ligne(s) dans " + table);
+        // System.out.println("[CRUD] findDataWithRequest → " + resultats.size() + " ligne(s) dans " + table);
         return resultats;
     }
 
@@ -290,7 +290,7 @@ public class GenericMethodCRUD {
                             // Pas de champ id trouvé
                         }
                     }
-                    System.out.println("[CRUD] insertData → id généré=" + genId + " dans " + table);
+                    // System.out.println("[CRUD] insertData → id généré=" + genId + " dans " + table);
                 }
             }
         }
@@ -330,7 +330,7 @@ public class GenericMethodCRUD {
         }
 
         if (set.length() == 0) {
-            System.out.println("[CRUD] update → aucun champ à mettre à jour dans " + table);
+            // System.out.println("[CRUD] update → aucun champ à mettre à jour dans " + table);
             return;
         }
 
@@ -344,7 +344,7 @@ public class GenericMethodCRUD {
                 ps.setObject(i + 1, valeurs.get(i));
             }
             int rows = ps.executeUpdate();
-            System.out.println("[CRUD] update → " + rows + " ligne(s) mise(s) à jour dans " + table + " (id=" + id + ")");
+            // System.out.println("[CRUD] update → " + rows + " ligne(s) mise(s) à jour dans " + table + " (id=" + id + ")");
         }
     }
 
@@ -361,7 +361,7 @@ public class GenericMethodCRUD {
 
             ps.setInt(1, id);
             int rows = ps.executeUpdate();
-            System.out.println("[CRUD] delete → " + rows + " ligne(s) supprimée(s) dans " + table + " (id=" + id + ")");
+            // System.out.println("[CRUD] delete → " + rows + " ligne(s) supprimée(s) dans " + table + " (id=" + id + ")");
         }
     }
 
