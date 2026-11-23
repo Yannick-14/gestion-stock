@@ -6,6 +6,8 @@ import inventory.ui.screen.LoginScreen;
 import inventory.ui.screen.StockMovementScreen;
 import inventory.ui.components.button.Button;
 
+import inventory.feature.applicationService.Session;
+
 import javax.swing.*;
 import java.awt.*;
 
@@ -24,9 +26,11 @@ import java.awt.*;
 public class Navigation extends JPanel {
 
     private final JPanel contentArea;
+    private final Session session = new Session();
 
-    // Boutons de navigation courants
     private Button activeButton;
+    private Button btnHome;
+    private Button btnAuth;
 
     public Navigation() {
         setLayout(new BorderLayout());
@@ -60,7 +64,14 @@ public class Navigation extends JPanel {
                 result.isSuccess() ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE
             );
 
+            if (result.isSuccess()) {
+                updateAuthButton();
+            }
+
             if (result.isRedirect()) {
+                if (btnHome != null) {
+                    setActive(btnHome);
+                }
                 showScreen(new HomeScreen());
             }
         });
@@ -93,7 +104,7 @@ public class Navigation extends JPanel {
         sidebar.add(Box.createVerticalStrut(10));
 
         // Entrées de navigation
-        Button btnHome = createNavButton("Accueil");
+        btnHome = createNavButton("Accueil");
         Button btnArticle = createNavButton("Insertion Article");
         Button btnMouvement = createNavButton("Mouvement de Stock");
 
@@ -120,9 +131,26 @@ public class Navigation extends JPanel {
         sidebar.add(Box.createVerticalGlue());
 
         // Bouton Connexion / Déconnexion
-        Button btnAuth = createNavSignupLogin("Connexion");
+        btnAuth = createNavSignupLogin();
 
-        btnAuth.addActionListener(e -> openLoginScreen());
+        btnAuth.addActionListener(e -> {
+            if (session.isLoggedIn()) {
+                session.logout();
+                updateAuthButton();
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Vous avez été déconnecté.",
+                    "Déconnexion",
+                    JOptionPane.INFORMATION_MESSAGE
+                );
+                if (btnHome != null) {
+                    setActive(btnHome);
+                }
+                showScreen(new HomeScreen());
+            } else {
+                openLoginScreen();
+            }
+        });
 
         sidebar.add(btnAuth);
 
@@ -144,8 +172,14 @@ public class Navigation extends JPanel {
         return btn;
     }
 
-    private Button createNavSignupLogin(String text) {
-        Button btn = new Button(text, Button.Style.SECONDARY);
+    private Button createNavSignupLogin() {
+        String btnString = "";
+        if(session.isLoggedIn()) {
+            btnString = "Déconnexion";
+        } else {
+            btnString = "Connexion";
+        }
+        Button btn = new Button(btnString, Button.Style.SECONDARY);
 
         btn.setMaximumSize(new Dimension(220, 44));
         btn.setPreferredSize(new Dimension(220, 44));
@@ -156,6 +190,12 @@ public class Navigation extends JPanel {
         btn.setBackground(new Color(45, 60, 90));
 
         return btn;
+    }
+
+    private void updateAuthButton() {
+        if (btnAuth != null) {
+            btnAuth.setText(session.isLoggedIn() ? "Déconnexion" : "Connexion");
+        }
     }
 
     private void setActive(Button btn) {

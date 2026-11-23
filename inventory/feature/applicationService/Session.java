@@ -3,9 +3,9 @@ package inventory.feature.applicationService;
 import inventory.models.Users;
 
 public class Session {
-    private Users currentUser;
-    private void setCurrentUser(Users user) {
-        this.currentUser = user;
+    private static Users currentUser;
+    private static void setCurrentUser(Users user) {
+        currentUser = user;
     }
 
     public void login(Users user) {
@@ -17,7 +17,7 @@ public class Session {
     }
 
     public boolean isLoggedIn() {
-        return this.getCurrentUser() != null;
+        return currentUser != null;
     }
 
     public void logout() {
@@ -25,6 +25,6 @@ public class Session {
     }
 
     public int getUserId() {
-        return this.getCurrentUser() != null ? this.getCurrentUser().getId() : -1;
+        return currentUser != null ? currentUser.getId() : -1;
     }
 }
